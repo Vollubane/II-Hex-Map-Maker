@@ -1,0 +1,9 @@
+[configuration]
+
+entry_symbol = "cpp_library_init"
+compatibility_minimum = 4.4
+
+[libraries]
+
+windows.debug.x86_64 = "../../build/cpp/Debug/cpp.dll"
+windows.release.x86_64 = "../../build/cpp/Release/cpp.dll"
