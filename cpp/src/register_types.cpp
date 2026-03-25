@@ -1,6 +1,8 @@
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/godot.hpp>
 
+#include "CameraModule/CameraMap.h"
+
 using namespace godot;
 
 void initialize_ii_hex_map_maker_module(ModuleInitializationLevel p_level) {
@@ -8,6 +10,7 @@ void initialize_ii_hex_map_maker_module(ModuleInitializationLevel p_level) {
         return;
     }
 
+    ClassDB::register_class<CameraMap>();
 
 }
 
