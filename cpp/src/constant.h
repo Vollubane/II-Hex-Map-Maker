@@ -1,3 +1,5 @@
+#pragma once
+
 enum class CameraMapMovementType // Type of movement for the cameraMap.
 {
     CAMERA_MAP_CLASSIC_MODE,
