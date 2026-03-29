@@ -1,5 +1,0 @@
-[gd_scene format=3 uid="uid://0yccde7tan2q"]
-
-[node name="MainMap" type="Node3D"]
-
-[node name="CameraMap" type="CameraMap" parent="."]

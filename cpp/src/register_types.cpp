@@ -10,7 +10,7 @@ void initialize_ii_hex_map_maker_module(ModuleInitializationLevel p_level) {
         return;
     }
 
-    ClassDB::register_class<CameraMap>();
+    ClassDB::register_class<CameraModule::CameraMap>();
 
 }
 
