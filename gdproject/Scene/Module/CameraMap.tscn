@@ -1,0 +1,3 @@
+[gd_scene format=3 uid="uid://d0mpmyi5ogsv8"]
+
+[node name="CameraMap" type="CameraMap"]

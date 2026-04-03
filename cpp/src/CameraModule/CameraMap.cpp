@@ -24,9 +24,10 @@ namespace CameraModule {
     }
 
     CameraMap::CameraMap() :
+        m_hexMapEventBus{nullptr},
         m_isSceneReady{false},
         m_viewCenterMapPosition{0,0},
-        m_cameraMode{CameraMapMovementType::CAMERA_MAP_CLASSIC_MODE},
+        m_cameraMode{E_CameraMapMovementType::CAMERA_MAP_CLASSIC_MODE},
         m_orbitYaw{0.0},
         m_orbitPitch{ANGULAR_LIMIT.y},
         m_orbitDistance{HEIGHT_LIMIT.x + (HEIGHT_LIMIT.y - HEIGHT_LIMIT.x) / 2.0}
@@ -47,6 +48,7 @@ namespace CameraModule {
         clampOrbitPitchToDistanceLimits();
         updateTransformFromViewCenter();
 
+        m_hexMapEventBus->emit_signal("camera_ready");
         if (!Object::cast_to<RootModule::RootMap>(this->get_parent())) {
             m_isSceneReady = true; // return true in debug
         }
@@ -68,7 +70,7 @@ namespace CameraModule {
         if (!mouse_motion.is_valid()) return; // Camera mouvement only run with mouse mouvement
         Vector2 mouseDelta = mouse_motion->get_relative();
         switch (m_cameraMode) {
-            case CameraMapMovementType::CAMERA_MAP_CLASSIC_MODE: {
+            case E_CameraMapMovementType::CAMERA_MAP_CLASSIC_MODE: {
                 if(Input::get_singleton()->is_action_pressed("CtrlCameraMouvement")) {
                     handleTopDownMovement(mouseDelta);
                 } else if(Input::get_singleton()->is_action_pressed("CameraMouvement")) {
@@ -76,13 +78,13 @@ namespace CameraModule {
                 }
                 break;
             }
-            case CameraMapMovementType::CAMERA_MAP_TOPDOWN_MODE: {
+            case E_CameraMapMovementType::CAMERA_MAP_TOPDOWN_MODE: {
                 if(Input::get_singleton()->is_action_pressed("CameraMouvement")) {
                     handleTopDownMovement(mouseDelta);
                 }
                 break;
             }
-            case CameraMapMovementType::CAMERA_MAP_MOUSE_MODE: {
+            case E_CameraMapMovementType::CAMERA_MAP_MOUSE_MODE: {
                 if(Input::get_singleton()->is_action_pressed("Interaction")) {
                     handleTopDownMovement(mouseDelta);
                 }
@@ -98,7 +100,7 @@ namespace CameraModule {
     }
 
     void CameraMap::handleCameraMapModeChanged(const int p_cameraMode) {
-        m_cameraMode = static_cast<CameraMapMovementType>(p_cameraMode);
+        m_cameraMode = static_cast<E_CameraMapMovementType>(p_cameraMode);
     }
 
     void CameraMap::updateViewCenterMapPosition(const Vector2 p_viewCenterMapPosition) {

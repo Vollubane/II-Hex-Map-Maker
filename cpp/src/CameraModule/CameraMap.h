@@ -28,7 +28,7 @@ namespace CameraModule {
             Node* m_hexMapEventBus;                 //!< Pointer to the scene event bus used to receive and emit HexMap signals.
             bool m_isSceneReady;                    //!< Whether the scene is fully initialized.
             Vector2 m_viewCenterMapPosition;        //!< Map coordinates at the center of the view.
-            CameraMapMovementType m_cameraMode;     //!< Current camera movement mode.
+            E_CameraMapMovementType m_cameraMode;   //!< Current camera movement mode.
             double m_orbitYaw;                      //!< Horizontal orbit angle around the current focus point.
             double m_orbitPitch;                    //!< Vertical orbit angle around the current focus point.
             double m_orbitDistance;                 //!< Distance from the camera to the current focus point.
