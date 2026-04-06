@@ -13,14 +13,14 @@ using namespace godot;
 namespace CameraModule {
 
     const Vector2 ANGULAR_LIMIT = Vector2(Math::deg_to_rad(-30.0), Math::deg_to_rad(-89.9));
-    const Vector2 HEIGHT_LIMIT = Vector2(5.0, 40.0);
-    const Vector2 ZOOM_STEP = Vector2(2.0, Math::deg_to_rad(4.0));
+    const Vector2 HEIGHT_LIMIT = Vector2(4.0, 16.0);
+    const Vector2 ZOOM_STEP = Vector2(1.0, Math::deg_to_rad(4.0));
     const Vector2 CAMERA_MOVE_STEP = Vector2(Math::deg_to_rad(0.25), 0.05);
     const Vector3 WORLD_UP = Vector3(0.0, 1.0, 0.0);
 
     void CameraMap::_bind_methods() {
-        ClassDB::bind_method(D_METHOD("handleSceneReady"), &CameraMap::handleSceneReady);
-        ClassDB::bind_method(D_METHOD("handleCameraMapModeChanged", "camera_mode"), &CameraMap::handleCameraMapModeChanged);
+        ClassDB::bind_method(D_METHOD("onSceneReady"), &CameraMap::onSceneReady);
+        ClassDB::bind_method(D_METHOD("onCameraMapModeChanged", "camera_mode"), &CameraMap::onCameraMapModeChanged);
     }
 
     CameraMap::CameraMap() :
@@ -43,7 +43,7 @@ namespace CameraModule {
             UtilityFunctions::push_error("CameraMap ready : Can't find HexMapEventBus");
             return;
         }
-        m_hexMapEventBus->connect("scene_ready", Callable(this, "handleSceneReady"));
+        m_hexMapEventBus->connect("scene_ready", Callable(this, "onSceneReady"));
 
         clampOrbitPitchToDistanceLimits();
         updateTransformFromViewCenter();
@@ -58,11 +58,11 @@ namespace CameraModule {
         if(!m_isSceneReady) return;
 
         if(Input::get_singleton()->is_action_just_pressed("CameraZoom+")) {
-            handleZoomIn();
+            onZoomIn();
             return;
         }
         if (Input::get_singleton()->is_action_just_pressed("CameraZoom-")) {
-            handleZoomOut();
+            onZoomOut();
             return;
         }
 
@@ -72,21 +72,21 @@ namespace CameraModule {
         switch (m_cameraMode) {
             case E_CameraMapMovementType::CAMERA_MAP_CLASSIC_MODE: {
                 if(Input::get_singleton()->is_action_pressed("CtrlCameraMouvement")) {
-                    handleTopDownMovement(mouseDelta);
+                    onTopDownMovement(mouseDelta);
                 } else if(Input::get_singleton()->is_action_pressed("CameraMouvement")) {
-                    handleOrbitMovement(mouseDelta);
+                    onOrbitMovement(mouseDelta);
                 }
                 break;
             }
             case E_CameraMapMovementType::CAMERA_MAP_TOPDOWN_MODE: {
                 if(Input::get_singleton()->is_action_pressed("CameraMouvement")) {
-                    handleTopDownMovement(mouseDelta);
+                    onTopDownMovement(mouseDelta);
                 }
                 break;
             }
             case E_CameraMapMovementType::CAMERA_MAP_MOUSE_MODE: {
                 if(Input::get_singleton()->is_action_pressed("Interaction")) {
-                    handleTopDownMovement(mouseDelta);
+                    onTopDownMovement(mouseDelta);
                 }
                 break;
             }
@@ -95,28 +95,28 @@ namespace CameraModule {
         }
     }
 
-    void CameraMap::handleSceneReady() {
+    void CameraMap::onSceneReady() {
         m_isSceneReady = true;
     }
 
-    void CameraMap::handleCameraMapModeChanged(const int p_cameraMode) {
+    void CameraMap::onCameraMapModeChanged(const int p_cameraMode) {
         m_cameraMode = static_cast<E_CameraMapMovementType>(p_cameraMode);
     }
 
-    void CameraMap::updateViewCenterMapPosition(const Vector2 p_viewCenterMapPosition) {
+    void CameraMap::emitViewCenterMapPosition(const Vector2 p_viewCenterMapPosition) {
         if(p_viewCenterMapPosition == m_viewCenterMapPosition) return;
 
         m_viewCenterMapPosition = p_viewCenterMapPosition;
         m_hexMapEventBus->emit_signal("center_map_position", m_viewCenterMapPosition);
     }
 
-    Vector2 CameraMap::computeViewCenterMapPosition() {
+    Vector2 CameraMap::getViewCenterMapPosition() {
         const Vector2 viewportCenter = get_viewport()->get_visible_rect().size * 0.5;
         const Vector3 rayOrigin = project_ray_origin(viewportCenter);
         const Vector3 rayDirection = project_ray_normal(viewportCenter);
 
         if (Math::is_zero_approx(rayDirection.y)) {
-            UtilityFunctions::push_warning("CameraMap computeViewCenterMapPosition : Near 0° angular of the camera");
+            UtilityFunctions::push_warning("CameraMap getViewCenterMapPosition : Near 0° angular of the camera");
             return Vector2();
         }
         const double t = -rayOrigin.y / rayDirection.y;
@@ -169,7 +169,7 @@ namespace CameraModule {
         look_at(focusPosition, WORLD_UP);
     }
 
-    void CameraMap::handleZoomIn() {
+    void CameraMap::onZoomIn() {
         m_orbitDistance = Math::max(
             m_orbitDistance - static_cast<double>(ZOOM_STEP.x),
             static_cast<double>(HEIGHT_LIMIT.x)
@@ -177,9 +177,13 @@ namespace CameraModule {
         clampOrbitPitchToDistanceLimits();
 
         updateTransformFromViewCenter();
+
+        const double t = (m_orbitDistance - HEIGHT_LIMIT.x) / (HEIGHT_LIMIT.y - HEIGHT_LIMIT.x);
+        const float ratio = static_cast<float>(Math::clamp(t, 0.0, 1.0));
+        m_hexMapEventBus->emit_signal("zoom_map_ratio", ratio);
     }
 
-    void CameraMap::handleZoomOut() {
+    void CameraMap::onZoomOut() {
         m_orbitDistance = Math::min(
             m_orbitDistance + static_cast<double>(ZOOM_STEP.x),
             static_cast<double>(HEIGHT_LIMIT.y)
@@ -187,9 +191,13 @@ namespace CameraModule {
         clampOrbitPitchToDistanceLimits();
 
         updateTransformFromViewCenter();
+
+        const double t = (m_orbitDistance - HEIGHT_LIMIT.x) / (HEIGHT_LIMIT.y - HEIGHT_LIMIT.x);
+        const float ratio = static_cast<float>(Math::clamp(t, 0.0, 1.0));
+        m_hexMapEventBus->emit_signal("zoom_map_ratio", ratio);
     }
 
-    void CameraMap::handleOrbitMovement(const Vector2 p_mouseDelta) {
+    void CameraMap::onOrbitMovement(const Vector2 p_mouseDelta) {
         m_orbitYaw -= p_mouseDelta.x * CAMERA_MOVE_STEP.x;
         m_orbitPitch -= p_mouseDelta.y * CAMERA_MOVE_STEP.x;
         clampOrbitPitchToDistanceLimits();
@@ -197,14 +205,14 @@ namespace CameraModule {
         updateTransformFromViewCenter();
     }
 
-    void CameraMap::handleTopDownMovement(const Vector2 p_mouseDelta) {
+    void CameraMap::onTopDownMovement(const Vector2 p_mouseDelta) {
         const real_t yaw = static_cast<real_t>(m_orbitYaw);
 
         Vector3 right = Vector3(Math::cos(yaw), 0.0, -Math::sin(yaw));
         Vector3 forward = Vector3(-Math::sin(yaw), 0.0, -Math::cos(yaw));
         Vector3 translation = (-p_mouseDelta.x * right + p_mouseDelta.y * forward) * CAMERA_MOVE_STEP.y;
 
-        updateViewCenterMapPosition(m_viewCenterMapPosition + Vector2(translation.x, translation.z));
+        emitViewCenterMapPosition(m_viewCenterMapPosition + Vector2(translation.x, translation.z));
         updateTransformFromViewCenter();
     }
 }

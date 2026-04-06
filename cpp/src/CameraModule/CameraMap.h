@@ -66,25 +66,25 @@ namespace CameraModule {
             /**
              * @brief Called when the scene is ready and camera movement can start.
             **/
-            void handleSceneReady();
+            void onSceneReady();
 
             /**
              * @brief Updates the current camera movement mode.
              * @param p_cameraMode New camera mode as an int.
              */
-            void handleCameraMapModeChanged(const int p_cameraMode);
+            void onCameraMapModeChanged(const int p_cameraMode);
 
             /**
              * @brief Updates and emits the current center position of the view.
              * @param p_viewCenterMapPosition New map position at the center of the view.
              */
-            void updateViewCenterMapPosition(const Vector2 p_viewCenterMapPosition);
+            void emitViewCenterMapPosition(const Vector2 p_viewCenterMapPosition);
 
             /**
              * @brief Computes the center of the current view on the map plane.
              * @return A 2D position on the map.
             **/
-            Vector2 computeViewCenterMapPosition();
+            Vector2 getViewCenterMapPosition();
 
             /**
              * @brief Recomputes the camera transform around the current map focus.
@@ -105,29 +105,29 @@ namespace CameraModule {
             void clampOrbitPitchToDistanceLimits();
 
             /**
-             * @brief Handles zoom-in input.
+             * @brief Reacts to zoom-in input.
              * @details Decreases the camera distance to the current focus point.
             **/
-            void handleZoomIn();
+            void onZoomIn();
 
             /**
-             * @brief Handles zoom-out input.
+             * @brief Reacts to zoom-out input.
              * @details Increases the camera distance to the current focus point.
             **/
-            void handleZoomOut();
+            void onZoomOut();
 
             /**
-             * @brief Handles orbit camera movement around the current focus point.
+             * @brief Reacts to orbit camera movement around the current focus point.
              * @param p_mouseDelta Relative mouse motion for the current input event.
              * @details Updates the orbit yaw and pitch without changing the orbit distance.
             **/
-            void handleOrbitMovement(const Vector2 p_mouseDelta);
+            void onOrbitMovement(const Vector2 p_mouseDelta);
 
             /**
-             * @brief Handles top-down camera movement.
+             * @brief Reacts to top-down camera movement.
              * @param p_mouseDelta Relative mouse motion for the current input event.
              * @details Moves the focus point on the map plane using the current yaw.
             **/
-            void handleTopDownMovement(const Vector2 p_mouseDelta);
+            void onTopDownMovement(const Vector2 p_mouseDelta);
     };
 }

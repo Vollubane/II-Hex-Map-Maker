@@ -4,6 +4,10 @@
 #include <string>
 #include <unordered_map>
 
+const float HEX_GRID_DIAMETER = 1.8f;
+const float HEX_TILES_ANIMATION_TIME = 1.0f;
+const int FPS_IN_CALCULATION = 60;
+
 const enum class E_CameraMapMovementType // Type of movement for the cameraMap.
 {
     CAMERA_MAP_CLASSIC_MODE,

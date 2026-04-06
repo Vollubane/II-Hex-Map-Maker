@@ -1,7 +1,8 @@
 [gd_scene load_steps=2 format=3 uid="uid://cstur5x0lvss6"]
 
 [sub_resource type="Environment" id="Environment_jd8ki"]
-background_energy_multiplier = 1.78
+background_mode = 1
+background_color = Color(0, 0, 0.117647, 1)
 ambient_light_source = 3
 ambient_light_color = Color(1, 1, 1, 1)
 

@@ -124,7 +124,6 @@ namespace RootModule {
     void RootMap::onTilesContainerReady() {
         m_modulesReady["TILES_CONTAINER"] = true;
         Array moduleNames = m_modulesReady.keys();
-        UtilityFunctions::print(moduleNames);
         for (int indexModules = 0; indexModules < moduleNames.size(); indexModules++)
         {
             const String moduleName = moduleNames[indexModules];

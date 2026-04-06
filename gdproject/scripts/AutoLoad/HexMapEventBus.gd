@@ -6,3 +6,4 @@ signal tilesContainer_ready
 
 signal camera_map_mode(mode : int)
 signal center_map_position(centerLocation : Vector2)
+signal zoom_map_ratio(zoomValue : float)

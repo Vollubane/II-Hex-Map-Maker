@@ -1,12 +1,11 @@
-[gd_scene load_steps=7 format=4 uid="uid://drojui3bk258t"]
+[gd_scene load_steps=5 format=4 uid="uid://cmy5ruglw2m6s"]
 
-[ext_resource type="Texture2D" uid="uid://db1ocscfru8sk" path="res://Ressource/2DTexture/HexTexture.png" id="1_nndpt"]
-[ext_resource type="Texture2D" uid="uid://b4nfo2qs7m35c" path="res://Ressource/2DTexture/HexTileBlank.png" id="2_flflp"]
+[ext_resource type="Texture2D" uid="uid://db1ocscfru8sk" path="res://Ressource/2DTexture/HexTexture.png" id="1_sy2s2"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_s8ae7"]
 resource_name = "HexMat"
 vertex_color_use_as_albedo = true
-albedo_texture = ExtResource("1_nndpt")
+albedo_texture = ExtResource("1_sy2s2")
 emission_enabled = true
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_adev8"]
@@ -41,15 +40,9 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_adev8")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_l2ur5"]
-transparency = 1
-vertex_color_use_as_albedo = true
-albedo_texture = ExtResource("2_flflp")
+[node name="Hextile" type="Node3D"]
 
-[node name="Tile3d" type="Tile3D"]
-visible = false
-
-[node name="Base" type="MeshInstance3D" parent="."]
+[node name="Circle" type="MeshInstance3D" parent="."]
 transform = Transform3D(100, 0, 0, 0, -4.37114e-06, 100, 0, -100, -4.37114e-06, 0, 0, 0)
 mesh = SubResource("ArrayMesh_2u4ej")
-surface_material_override/0 = SubResource("StandardMaterial3D_l2ur5")
+skeleton = NodePath("")
