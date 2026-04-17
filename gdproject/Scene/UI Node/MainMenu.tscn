@@ -1,0 +1,248 @@
+[gd_scene load_steps=12 format=3 uid="uid://bncpp00u1fd34"]
+
+[ext_resource type="Theme" uid="uid://bn75xffs0b7v8" path="res://Ressource/PanelTheme/ClassiqueTheme.tres" id="1_lowec"]
+[ext_resource type="Theme" uid="uid://d1bbw4jc26hyy" path="res://Ressource/PanelTheme/Title&FlatButtonTheme.tres" id="2_j8lcn"]
+[ext_resource type="Theme" uid="uid://cwoxbbjk540ed" path="res://Ressource/PanelTheme/ClassiqueGreenTheme.tres" id="3_88nc8"]
+[ext_resource type="Script" uid="uid://c1vtub3fn0svb" path="res://scripts/UI/HexMapList.gd" id="HexMapList_script"]
+[ext_resource type="Script" uid="uid://cgw5giwgdj8o5" path="res://scripts/UI/MainMenu.gd" id="MainMenu_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lwqwb"]
+bg_color = Color(0, 0, 0.117647, 1)
+
+[sub_resource type="FontVariation" id="FontVariation_tmyvx"]
+spacing_top = -8
+spacing_bottom = -3
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bd6hl"]
+content_margin_left = 1.0
+bg_color = Color(0.113725, 0.133333, 0.160784, 1)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+
+[sub_resource type="FontVariation" id="FontVariation_lwqwb"]
+spacing_top = -16
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nbewf"]
+content_margin_left = 4.0
+content_margin_top = 0.0
+content_margin_right = 4.0
+content_margin_bottom = 0.0
+bg_color = Color(0.6, 0.6, 0.6, 0)
+border_width_top = 7
+border_width_bottom = 8
+border_color = Color(0.8, 0.8, 0.8, 0.117647)
+corner_radius_top_left = 20
+corner_radius_top_right = 20
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 20
+expand_margin_top = 8.0
+expand_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6eo2g"]
+
+[node name="MainMenu" type="Control"]
+clip_contents = true
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("MainMenu_script")
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_lwqwb")
+
+[node name="MainPanel" type="Panel" parent="."]
+clip_contents = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -180.0
+offset_top = -200.0
+offset_right = 180.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_lowec")
+
+[node name="Title" type="Label" parent="MainPanel"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -230.0
+offset_right = 230.0
+offset_bottom = 73.0
+grow_horizontal = 2
+theme = ExtResource("2_j8lcn")
+theme_override_font_sizes/font_size = 40
+text = "II Hex Map Maker"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Version" type="Label" parent="MainPanel/Title"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -20.0
+offset_top = -3.0
+offset_right = 20.0
+offset_bottom = 23.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_font_sizes/font_size = 18
+text = "v 0.1"
+horizontal_alignment = 1
+
+[node name="Credit Button" type="Button" parent="MainPanel"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -37.0
+offset_top = -45.0
+offset_right = 37.0
+offset_bottom = -13.0
+grow_horizontal = 2
+grow_vertical = 0
+focus_mode = 0
+theme = ExtResource("2_j8lcn")
+text = "Credits"
+
+[node name="HexMap Button" type="Button" parent="MainPanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -170.0
+offset_top = -91.0
+offset_right = 170.0
+offset_bottom = 19.0
+grow_horizontal = 2
+grow_vertical = 2
+focus_mode = 0
+theme = ExtResource("1_lowec")
+theme_override_font_sizes/font_size = 38
+text = "HexMap Maker
+"
+
+[node name="TilePack Button" type="Button" parent="MainPanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -170.0
+offset_top = 29.0
+offset_right = 170.0
+offset_bottom = 139.0
+grow_horizontal = 2
+grow_vertical = 2
+focus_mode = 0
+theme = ExtResource("1_lowec")
+theme_override_font_sizes/font_size = 38
+text = "TilesPack Maker
+"
+
+[node name="HexMapList" type="Panel" parent="."]
+visible = false
+clip_contents = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -275.0
+offset_top = -350.0
+offset_right = 275.0
+offset_bottom = 350.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("3_88nc8")
+script = ExtResource("HexMapList_script")
+
+[node name="Title" type="Label" parent="HexMapList"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -252.5
+offset_top = -6.0
+offset_right = 252.5
+offset_bottom = 84.0
+grow_horizontal = 2
+theme = ExtResource("2_j8lcn")
+theme_override_font_sizes/font_size = 65
+text = "Select your map"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Button" type="Button" parent="HexMapList"]
+layout_mode = 0
+offset_left = 524.0
+offset_top = 5.0
+offset_right = 545.0
+offset_bottom = 26.0
+focus_mode = 0
+theme_override_fonts/font = SubResource("FontVariation_tmyvx")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_bd6hl")
+text = "x"
+
+[node name="HexMap Button" type="Button" parent="HexMapList"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -260.0
+offset_top = 88.0
+offset_right = 260.0
+offset_bottom = 188.0
+grow_horizontal = 2
+focus_mode = 0
+theme = ExtResource("3_88nc8")
+theme_override_fonts/font = SubResource("FontVariation_lwqwb")
+theme_override_font_sizes/font_size = 80
+text = "New map
+"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="HexMapList"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -269.0
+offset_top = 201.0
+offset_right = 270.0
+offset_bottom = 685.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_nbewf")
+theme_override_styles/focus = SubResource("StyleBoxFlat_6eo2g")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HexMapList/ScrollContainer"]
+clip_contents = true
+layout_mode = 2
+size_flags_horizontal = 3

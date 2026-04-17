@@ -4,6 +4,7 @@
 #include "CameraModule/CameraMap.h"
 #include "HexMapDisplayerModule/TilesContainer.h"
 #include "RootModule/RootMap.h"
+#include "RootModule/RootTilesPack.h"
 #include "TileModule/Tile3D.h"
 
 using namespace godot;
@@ -20,6 +21,7 @@ void initialize_ii_hex_map_maker_module(ModuleInitializationLevel p_level) {
     ClassDB::register_runtime_class<TileModule::Tile3D>();
 
     ClassDB::register_runtime_class<RootModule::RootMap>();
+    ClassDB::register_runtime_class<RootModule::RootTilesPack>();
 
 }
 

@@ -1,0 +1,65 @@
+[gd_resource type="Theme" load_steps=4 format=3 uid="uid://d1bbw4jc26hyy"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_v0unx"]
+bg_color = Color(0.213, 0.24345, 0.3, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.144, 0.162667, 0.2, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+expand_margin_left = 12.0
+expand_margin_top = 3.0
+expand_margin_right = 12.0
+expand_margin_bottom = 3.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0rbvx"]
+bg_color = Color(0.1656, 0.189213, 0.23, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.0781, 0.0913917, 0.11, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+expand_margin_left = 12.0
+expand_margin_top = 3.0
+expand_margin_right = 12.0
+expand_margin_bottom = 3.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bnwan"]
+bg_color = Color(0.1349, 0.154185, 0.19, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.146, 0.1685, 0.2, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+expand_margin_left = 12.0
+expand_margin_top = 3.0
+expand_margin_right = 12.0
+expand_margin_bottom = 3.0
+
+[resource]
+Button/colors/font_color = Color(0.94, 0.94, 0.94, 1)
+Button/colors/font_hover_color = Color(0.87, 0.87, 0.87, 1)
+Button/font_sizes/font_size = 21
+Button/styles/hover = SubResource("StyleBoxFlat_v0unx")
+Button/styles/normal = SubResource("StyleBoxFlat_0rbvx")
+Button/styles/pressed = SubResource("StyleBoxFlat_bnwan")
+Label/colors/font_color = Color(0.866667, 0.866667, 0.866667, 1)
+Label/colors/font_outline_color = Color(0.180392, 0.180392, 0.180392, 1)
+Label/colors/font_shadow_color = Color(0, 0, 0.117647, 1)
+Label/constants/outline_size = 10
+Label/constants/shadow_offset_x = 3
+Label/constants/shadow_offset_y = 3
+Label/constants/shadow_outline_size = 5
+Label/font_sizes/font_size = 53

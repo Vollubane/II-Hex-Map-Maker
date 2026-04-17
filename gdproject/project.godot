@@ -11,12 +11,21 @@ config_version=5
 [application]
 
 config/name="IIHexMapMaker"
+config/version="0.0.1"
+run/main_scene="uid://dmmakl4k6gegg"
 config/features=PackedStringArray("4.4", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [autoload]
 
 HexMapEventBus="*res://scripts/AutoLoad/HexMapEventBus.gd"
+RuntimeData="*res://scripts/AutoLoad/RuntimeData.gd"
+
+[display]
+
+window/size/viewport_width=1536
+window/size/viewport_height=864
+window/size/mode=2
 
 [input]
 

@@ -1,0 +1,17 @@
+[gd_scene load_steps=3 format=3 uid="uid://dmmakl4k6gegg"]
+
+[ext_resource type="PackedScene" uid="uid://bncpp00u1fd34" path="res://Scene/UI Node/MainMenu.tscn" id="1_h0j25"]
+
+[sub_resource type="Environment" id="Environment_h0j25"]
+background_mode = 1
+background_color = Color(0, 0, 0.117647, 1)
+ambient_light_source = 3
+ambient_light_color = Color(1, 1, 1, 1)
+
+[node name="PrimaryRoot" type="Node"]
+editor_description = "The root node of the app, don't use c++ it's only to load real scene and navigate trough option."
+
+[node name="MainMenu" parent="." instance=ExtResource("1_h0j25")]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_h0j25")
