@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://c11wu5vwjtt5o"]
+
+[ext_resource type="Script" uid="uid://d4ngqq8xef728" path="res://scripts/Lab/LabImporterTest.gd" id="1_lab_importer"]
+
+[node name="LabImporterTest" type="Node3D"]
+script = ExtResource("1_lab_importer")

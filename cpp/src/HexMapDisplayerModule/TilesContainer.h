@@ -64,7 +64,7 @@ namespace HMDisplayerModule {
             /**
              * @brief Processes timed unload and load batches for tile nodes.
              * @param p_delta Elapsed time since the previous frame (unused; work is budgeted in microseconds).
-             * @details Adjusts @ref m_pendingPackSize from measured cost to stay within a frame budget.
+             * @details Adjusts  m_pendingPackSize from measured cost to stay within a frame budget.
             **/
             void _process(double p_delta);
 
@@ -87,19 +87,19 @@ namespace HMDisplayerModule {
              * @param p_remainingTileToPool Number of Tile3D instances still to instantiate into the pool.
              * @param p_remainingTilePositionToSpawn Axial positions to fill after pooling is complete.
              * @param p_packSize How many operations to run per inner loop before measuring time.
-             * @details Emits @c tilesContainer_ready on the event bus when both pool and spawn lists are done.
+             * @details Emits  tilesContainer_ready on the event bus when both pool and spawn lists are done.
             **/
             void loadTilesContainer(const int p_remainingTileToPool, const Array p_remainingTilePositionToSpawn, const int p_packSize = 10);
 
             /**
              * @brief Recomputes which tiles should be visible and fills load/unload queues.
-             * @details Compares the desired axial disk with @ref m_coordonateOfMappedTiles.
+             * @details Compares the desired axial disk with  m_coordonateOfMappedTiles.
             **/
             void updateMap();
 
 
             /**
-             * @brief Defers the next @ref loadTilesContainer step to the next frame via a zero-delay timer.
+             * @brief Defers the next  loadTilesContainer step to the next frame via a zero-delay timer.
              * @param p_remainingTileToPool Remaining pool count to pass to the next step.
              * @param p_remainingTilePositionToSpawn Positions left to spawn.
              * @param p_packSize Batch size for the next step.
@@ -107,7 +107,7 @@ namespace HMDisplayerModule {
             void scheduleLoadTilesNextFrame(const int p_remainingTileToPool, const Array &p_remainingTilePositionToSpawn, const int p_packSize);
 
             /**
-             * @brief Timer callback that continues asynchronous @ref loadTilesContainer.
+             * @brief Timer callback that continues asynchronous  loadTilesContainer.
             **/
             void onLoadTilesPendingTimeout();
 
@@ -123,7 +123,7 @@ namespace HMDisplayerModule {
              * @brief Lists every axial tile position inside a hex disk (ring enumeration).
              * @param p_centerTilePosition Disk center in axial coordinates.
              * @param p_radius Inclusive hex distance from the center to the edge of the disk.
-             * @return Array of @c Vector2i positions covering the disk.
+             * @return Array of  Vector2i positions covering the disk.
             **/
             const Array getDiskTilesPosition(const Vector2i p_centerTilePosition, const int p_radius);
 

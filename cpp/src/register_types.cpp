@@ -6,6 +6,8 @@
 #include "RootModule/RootMap.h"
 #include "RootModule/RootTilesPack.h"
 #include "TileModule/Tile3D.h"
+#include "ImportExportModule/Importer.h"
+#include "ImportExportModule/ImporterPictureMaker.h"
 
 using namespace godot;
 
@@ -22,6 +24,9 @@ void initialize_ii_hex_map_maker_module(ModuleInitializationLevel p_level) {
 
     ClassDB::register_runtime_class<RootModule::RootMap>();
     ClassDB::register_runtime_class<RootModule::RootTilesPack>();
+
+    ClassDB::register_runtime_class<ImportExportModule::Importer>();
+    ClassDB::register_runtime_class<ImportExportModule::ImporterPictureMaker>();
 
 }
 

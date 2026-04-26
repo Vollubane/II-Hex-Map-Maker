@@ -1,9 +1,11 @@
-[gd_scene load_steps=12 format=3 uid="uid://bncpp00u1fd34"]
+[gd_scene load_steps=14 format=3 uid="uid://bncpp00u1fd34"]
 
 [ext_resource type="Theme" uid="uid://bn75xffs0b7v8" path="res://Ressource/PanelTheme/ClassiqueTheme.tres" id="1_lowec"]
 [ext_resource type="Theme" uid="uid://d1bbw4jc26hyy" path="res://Ressource/PanelTheme/Title&FlatButtonTheme.tres" id="2_j8lcn"]
 [ext_resource type="Theme" uid="uid://cwoxbbjk540ed" path="res://Ressource/PanelTheme/ClassiqueGreenTheme.tres" id="3_88nc8"]
+[ext_resource type="Theme" uid="uid://cmbam06wcmkwr" path="res://Ressource/PanelTheme/ClassiqueRedTheme.tres" id="6_lwqwb"]
 [ext_resource type="Script" uid="uid://c1vtub3fn0svb" path="res://scripts/UI/HexMapList.gd" id="HexMapList_script"]
+[ext_resource type="Script" uid="uid://c5srdrtock84j" path="res://scripts/UI/HexPackList.gd" id="HexPackList_script"]
 [ext_resource type="Script" uid="uid://cgw5giwgdj8o5" path="res://scripts/UI/MainMenu.gd" id="MainMenu_script"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lwqwb"]
@@ -74,7 +76,7 @@ anchor_bottom = 0.5
 offset_left = -180.0
 offset_top = -200.0
 offset_right = 180.0
-offset_bottom = 200.0
+offset_bottom = 310.0
 grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("1_lowec")
@@ -108,7 +110,7 @@ offset_bottom = 23.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_font_sizes/font_size = 18
-text = "v 0.1"
+text = "v 0.0.1"
 horizontal_alignment = 1
 
 [node name="Credit Button" type="Button" parent="MainPanel"]
@@ -136,9 +138,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -170.0
-offset_top = -91.0
+offset_top = -153.0
 offset_right = 170.0
-offset_bottom = 19.0
+offset_bottom = -43.0
 grow_horizontal = 2
 grow_vertical = 2
 focus_mode = 0
@@ -155,15 +157,34 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -170.0
-offset_top = 29.0
+offset_top = -36.0
 offset_right = 170.0
-offset_bottom = 139.0
+offset_bottom = 74.0
 grow_horizontal = 2
 grow_vertical = 2
 focus_mode = 0
 theme = ExtResource("1_lowec")
 theme_override_font_sizes/font_size = 38
 text = "TilesPack Maker
+"
+
+[node name="AssetManager Button" type="Button" parent="MainPanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -170.0
+offset_top = 83.0
+offset_right = 170.0
+offset_bottom = 193.0
+grow_horizontal = 2
+grow_vertical = 2
+focus_mode = 0
+theme = ExtResource("1_lowec")
+theme_override_font_sizes/font_size = 38
+text = "Asset Manager
 "
 
 [node name="HexMapList" type="Panel" parent="."]
@@ -243,6 +264,87 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_nbewf")
 theme_override_styles/focus = SubResource("StyleBoxFlat_6eo2g")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="HexMapList/ScrollContainer"]
+clip_contents = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="HexPackList" type="Panel" parent="."]
+visible = false
+clip_contents = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -275.0
+offset_top = -350.0
+offset_right = 275.0
+offset_bottom = 350.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("6_lwqwb")
+script = ExtResource("HexPackList_script")
+
+[node name="Title" type="Label" parent="HexPackList"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -252.5
+offset_top = -6.0
+offset_right = 252.5
+offset_bottom = 84.0
+grow_horizontal = 2
+theme = ExtResource("2_j8lcn")
+theme_override_font_sizes/font_size = 65
+text = "Select your Pack"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Button" type="Button" parent="HexPackList"]
+layout_mode = 0
+offset_left = 524.0
+offset_top = 5.0
+offset_right = 545.0
+offset_bottom = 26.0
+focus_mode = 0
+theme_override_fonts/font = SubResource("FontVariation_tmyvx")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_bd6hl")
+text = "x"
+
+[node name="HexMap Button" type="Button" parent="HexPackList"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -260.0
+offset_top = 88.0
+offset_right = 260.0
+offset_bottom = 188.0
+grow_horizontal = 2
+focus_mode = 0
+theme = ExtResource("6_lwqwb")
+theme_override_fonts/font = SubResource("FontVariation_lwqwb")
+theme_override_font_sizes/font_size = 80
+text = "New pack
+"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="HexPackList"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -269.0
+offset_top = 201.0
+offset_right = 270.0
+offset_bottom = 685.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_nbewf")
+theme_override_styles/focus = SubResource("StyleBoxFlat_6eo2g")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HexPackList/ScrollContainer"]
 clip_contents = true
 layout_mode = 2
 size_flags_horizontal = 3

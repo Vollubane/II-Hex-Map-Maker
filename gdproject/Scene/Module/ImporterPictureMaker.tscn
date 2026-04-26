@@ -1,0 +1,23 @@
+[gd_scene load_steps=2 format=3 uid="uid://bct6kuhwno1ky"]
+
+[sub_resource type="Environment" id="Environment_ipm1"]
+background_mode = 1
+background_color = Color(0, 0, 0.117647, 1)
+ambient_light_source = 3
+ambient_light_color = Color(1, 1, 1, 1)
+
+[node name="ImporterPictureMaker" type="ImporterPictureMaker"]
+own_world_3d = true
+gui_disable_input = true
+size = Vector2i(256, 256)
+render_target_update_mode = 4
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_ipm1")
+
+[node name="PreviewCamera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 0.968354, 0.45)
+current = true
+fov = 50.0
+near = 0.01
+far = 100.0

@@ -1,0 +1,293 @@
+[gd_scene load_steps=21 format=3 uid="uid://c8r1doioaovjs"]
+
+[ext_resource type="Theme" uid="uid://bn75xffs0b7v8" path="res://Ressource/PanelTheme/ClassiqueTheme.tres" id="1_6sahm"]
+[ext_resource type="Script" uid="uid://kmshj4btr260" path="res://scripts/UI/AssetPackDisplayer.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://borv8wm4b3n5e" path="res://Ressource/UI Logo/TrashCan.png" id="3_5rrox"]
+[ext_resource type="Texture2D" uid="uid://cynjod04aochf" path="res://Ressource/UI Logo/EditButton.png" id="4_jhfwv"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nmee8"]
+bg_color = Color(0.6, 0.6, 0.6, 0)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5rrox"]
+bg_color = Color(0.2736, 0.312613, 0.38, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.847059, 0.866667, 0.898039, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jhfwv"]
+bg_color = Color(0.2736, 0.312613, 0.38, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.113725, 0.133333, 0.160784, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hvs1m"]
+bg_color = Color(0.188235, 0.215686, 0.262745, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.846288, 0.867101, 0.896364, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ff3pp"]
+bg_color = Color(0.188235, 0.215686, 0.262745, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.113725, 0.133333, 0.160784, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="FontVariation" id="FontVariation_title"]
+spacing_top = -3
+spacing_bottom = -1
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_title"]
+content_margin_left = 0.0
+content_margin_top = 1.0
+bg_color = Color(0.6, 0.6, 0.6, 0)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_info"]
+content_margin_left = 3.0
+bg_color = Color(0.6, 0.6, 0.6, 0)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7ab1v"]
+bg_color = Color(0.490196, 0, 0, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.113725, 0.133333, 0.160784, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ilmx3"]
+bg_color = Color(0.79, 0, 0, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.113725, 0.133333, 0.160784, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ick5f"]
+bg_color = Color(0.49, 0, 0, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.113725, 0.133333, 0.160784, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_74pjh"]
+bg_color = Color(0.69, 0, 0, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.113725, 0.133333, 0.160784, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_8oim0"]
+content_margin_left = 7.0
+content_margin_top = 5.0
+content_margin_right = 5.0
+content_margin_bottom = 7.0
+bg_color = Color(0, 0.176471, 0.301961, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.113725, 0.133333, 0.160784, 1)
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_u5l2q"]
+content_margin_left = 7.0
+content_margin_top = 5.0
+content_margin_right = 5.0
+content_margin_bottom = 7.0
+bg_color = Color(0, 0.28, 0.48, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.113725, 0.133333, 0.160784, 1)
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bd5j0"]
+content_margin_left = 7.0
+content_margin_top = 5.0
+content_margin_right = 5.0
+content_margin_bottom = 7.0
+bg_color = Color(0, 0.175, 0.3, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.113725, 0.133333, 0.160784, 1)
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mgnqs"]
+content_margin_left = 7.0
+content_margin_top = 5.0
+content_margin_right = 5.0
+content_margin_bottom = 7.0
+bg_color = Color(0, 0.222278, 0.385518, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.113725, 0.133333, 0.160784, 1)
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[node name="AssetPackDisplayer" type="PanelContainer"]
+custom_minimum_size = Vector2(100, 59)
+offset_right = 292.0
+offset_bottom = 59.0
+size_flags_horizontal = 3
+size_flags_vertical = 4
+theme_override_styles/panel = SubResource("StyleBoxFlat_nmee8")
+script = ExtResource("1_script")
+
+[node name="MainButton" type="Button" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+focus_mode = 0
+theme = ExtResource("1_6sahm")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_5rrox")
+theme_override_styles/hover = SubResource("StyleBoxFlat_jhfwv")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_hvs1m")
+theme_override_styles/normal = SubResource("StyleBoxFlat_ff3pp")
+toggle_mode = true
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MainButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 5.0
+offset_top = -5.0
+offset_bottom = 5.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 5
+
+[node name="VBoxLabels" type="VBoxContainer" parent="MainButton/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+mouse_filter = 2
+
+[node name="TitleSlot" type="Control" parent="MainButton/HBoxContainer/VBoxLabels"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="TitleLabel" type="Label" parent="MainButton/HBoxContainer/VBoxLabels/TitleSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/line_spacing = 0
+theme_override_fonts/font = SubResource("FontVariation_title")
+theme_override_font_sizes/font_size = 26
+theme_override_styles/normal = SubResource("StyleBoxFlat_title")
+text = "Nom du pack"
+clip_text = true
+
+[node name="TitleLineEdit" type="LineEdit" parent="MainButton/HBoxContainer/VBoxLabels/TitleSlot"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/caret_width = 2
+theme_override_fonts/font = SubResource("FontVariation_title")
+theme_override_font_sizes/font_size = 26
+theme_override_styles/focus = SubResource("StyleBoxFlat_title")
+theme_override_styles/normal = SubResource("StyleBoxFlat_title")
+
+[node name="InfoLabel" type="Label" parent="MainButton/HBoxContainer/VBoxLabels"]
+custom_minimum_size = Vector2(1, 1)
+layout_mode = 2
+size_flags_vertical = 0
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("StyleBoxFlat_info")
+text = "V0.0.0.1 | 2.6Go | 10/01/2026 | 25604 asset"
+autowrap_mode = 2
+
+[node name="VBoxLabels2" type="VBoxContainer" parent="MainButton/HBoxContainer"]
+custom_minimum_size = Vector2(42, 59)
+layout_mode = 2
+size_flags_horizontal = 8
+size_flags_vertical = 4
+mouse_filter = 0
+theme_override_constants/separation = -1
+
+[node name="DeleteButton" type="Button" parent="MainButton/HBoxContainer/VBoxLabels2"]
+custom_minimum_size = Vector2(4, 4)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+focus_mode = 0
+theme_override_colors/icon_hover_pressed_color = Color(0.113725, 0.133333, 0.160784, 1)
+theme_override_colors/icon_hover_color = Color(0.113725, 0.133333, 0.160784, 1)
+theme_override_colors/icon_pressed_color = Color(0.113725, 0.133333, 0.160784, 1)
+theme_override_colors/icon_normal_color = Color(0.113725, 0.133333, 0.160784, 1)
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_7ab1v")
+theme_override_styles/hover = SubResource("StyleBoxFlat_ilmx3")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_ick5f")
+theme_override_styles/normal = SubResource("StyleBoxFlat_74pjh")
+icon = ExtResource("3_5rrox")
+icon_alignment = 1
+expand_icon = true
+
+[node name="RenameButton" type="Button" parent="MainButton/HBoxContainer/VBoxLabels2"]
+custom_minimum_size = Vector2(4, 4)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+focus_mode = 0
+theme_override_colors/icon_hover_pressed_color = Color(0.113725, 0.133333, 0.160784, 1)
+theme_override_colors/icon_hover_color = Color(0.113725, 0.133333, 0.160784, 1)
+theme_override_colors/icon_pressed_color = Color(0.113725, 0.133333, 0.160784, 1)
+theme_override_colors/icon_normal_color = Color(0.113725, 0.133333, 0.160784, 1)
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_8oim0")
+theme_override_styles/hover = SubResource("StyleBoxFlat_u5l2q")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_bd5j0")
+theme_override_styles/normal = SubResource("StyleBoxFlat_mgnqs")
+icon = ExtResource("4_jhfwv")
+icon_alignment = 1
+expand_icon = true
