@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://dpb6qgsv0jv1q"]
+[gd_scene load_steps=15 format=3 uid="uid://dpb6qgsv0jv1q"]
 
 [ext_resource type="Script" uid="uid://hteutn1y3ncr" path="res://scripts/UI/DeletePanel.gd" id="DeletePanel_script"]
 
@@ -121,8 +121,9 @@ corner_radius_top_right = 12
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
 
+[sub_resource type="FontVariation" id="FontVariation_nms2r"]
+
 [node name="DeletePanel" type="Panel"]
-visible = false
 custom_minimum_size = Vector2(400, 250)
 anchors_preset = 15
 anchor_right = 1.0
@@ -133,17 +134,17 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_6bwou")
 script = ExtResource("DeletePanel_script")
 
 [node name="Panel" type="Panel" parent="."]
-custom_minimum_size = Vector2(600, 300)
+custom_minimum_size = Vector2(385, 230)
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -300.0
-offset_top = -150.0
-offset_right = 300.0
-offset_bottom = 150.0
+offset_left = -193.0
+offset_top = -129.0
+offset_right = 193.0
+offset_bottom = 129.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_yv3ja")
@@ -155,10 +156,10 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -290.0
-offset_top = -100.0
-offset_right = 290.0
-offset_bottom = -10.0
+offset_left = -182.5
+offset_top = -99.0
+offset_right = 182.5
+offset_bottom = -9.0
 grow_horizontal = 2
 grow_vertical = 0
 
@@ -173,7 +174,7 @@ theme_override_colors/font_hover_color = Color(0.101961, 0.101961, 0.101961, 0.6
 theme_override_colors/font_color = Color(0.1, 0.1, 0.1, 0.666667)
 theme_override_colors/font_pressed_color = Color(0.101961, 0.101961, 0.101961, 0.666667)
 theme_override_fonts/font = SubResource("FontVariation_6bwou")
-theme_override_font_sizes/font_size = 80
+theme_override_font_sizes/font_size = 60
 theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_nms2r")
 theme_override_styles/hover = SubResource("StyleBoxFlat_w56ta")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_vd5iq")
@@ -193,7 +194,7 @@ theme_override_colors/font_hover_color = Color(0.101961, 0.101961, 0.101961, 0.6
 theme_override_colors/font_color = Color(0.101961, 0.101961, 0.101961, 0.666667)
 theme_override_colors/font_pressed_color = Color(0.101961, 0.101961, 0.101961, 0.666667)
 theme_override_fonts/font = SubResource("FontVariation_yv3ja")
-theme_override_font_sizes/font_size = 80
+theme_override_font_sizes/font_size = 60
 theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_4dr75")
 theme_override_styles/hover = SubResource("StyleBoxFlat_dbryl")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_ntyln")
@@ -206,8 +207,10 @@ expand_icon = true
 layout_mode = 0
 offset_left = 10.0
 offset_top = 9.0
-offset_right = 592.0
-offset_bottom = 193.0
-theme_override_font_sizes/font_size = 28
+offset_right = 376.0
+offset_bottom = 154.0
+theme_override_constants/paragraph_spacing = 10
+theme_override_fonts/font = SubResource("FontVariation_nms2r")
+theme_override_font_sizes/font_size = 24
 horizontal_alignment = 1
 autowrap_mode = 3

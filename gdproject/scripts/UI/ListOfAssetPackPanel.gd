@@ -126,7 +126,7 @@ func _format_info_line(data: Dictionary) -> String:
 		var s := str(av).strip_edges()
 		if s.is_valid_float():
 			assets_i = int(float(s))
-	return "%s | %s | %s | %d asset(s)" % [ver_s, poid_s, date_s, assets_i]
+	return "%s | %s | %s | %d assets" % [ver_s, poid_s, date_s, assets_i]
 
 
 func _pack_dirs_sorted() -> Array[String]:
@@ -251,7 +251,7 @@ func _on_row_title_submitted(new_title: String, displayer: AssetPackDisplayer) -
 		return
 
 	if _is_nom_taken_by_other_pack(old_dir, nom):
-		push_warning("ListOfAssetPackPanel: nom déjà utilisé")
+		push_warning("ListOfAssetPackPanel: pack display name already in use.")
 		displayer.set_title(restore_title)
 		return
 
@@ -261,14 +261,14 @@ func _on_row_title_submitted(new_title: String, displayer: AssetPackDisplayer) -
 		return
 
 	if stem != folder_base and da.dir_exists(stem):
-		push_warning("ListOfAssetPackPanel: dossier déjà existant")
+		push_warning("ListOfAssetPackPanel: folder name already exists.")
 		displayer.set_title(restore_title)
 		return
 
 	if stem != folder_base:
 		var err := da.rename(folder_base, stem)
 		if err != OK:
-			push_error("ListOfAssetPackPanel: rename dossier %s" % err)
+			push_error("ListOfAssetPackPanel: folder rename failed (%s)." % err)
 			displayer.set_title(restore_title)
 			return
 		old_dir = ASSET_PACKS_DIR.path_join(stem)
@@ -279,7 +279,7 @@ func _on_row_title_submitted(new_title: String, displayer: AssetPackDisplayer) -
 	var m := _read_pack_dict(manifest_path)
 	m[KEY_NOM] = nom
 	if _write_json(manifest_path, m) != OK:
-		push_error("ListOfAssetPackPanel: écriture manifeste")
+		push_error("ListOfAssetPackPanel: manifest write failed.")
 		displayer.set_title(restore_title)
 		return
 
@@ -304,16 +304,16 @@ func _on_new_pack_pressed() -> void:
 	var pack_dir := ASSET_PACKS_DIR.path_join(folder_name)
 	var da_new := DirAccess.open(ASSET_PACKS_DIR)
 	if da_new == null:
-		push_error("ListOfAssetPackPanel: ouverture dossier Asset Packs")
+		push_error("ListOfAssetPackPanel: cannot open Asset Packs directory.")
 		return
 	var err := da_new.make_dir(folder_name)
 	if err != OK and err != ERR_ALREADY_EXISTS:
-		push_error("ListOfAssetPackPanel: création dossier pack (%s)" % err)
+		push_error("ListOfAssetPackPanel: pack folder creation failed (%s)." % err)
 		return
 	var manifest_path := pack_dir.path_join(MANIFEST_FILE)
 	var data := _minimal_manifest(folder_name)
 	if _write_json(manifest_path, data) != OK:
-		push_error("ListOfAssetPackPanel: écriture manifeste")
+		push_error("ListOfAssetPackPanel: manifest write failed.")
 		return
 	_refresh_pack_list()
 	if _asset_editor and _asset_editor.has_method("open_for_pack"):

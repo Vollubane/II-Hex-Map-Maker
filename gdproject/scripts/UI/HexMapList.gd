@@ -2,7 +2,7 @@ extends Panel
 
 const MAPS_DIR := "user://Map"
 
-## Heure locale PC (dict Time.get_datetime_dict_from_system).
+## Local datetime dict from `Time.get_datetime_dict_from_system`.
 const KEY_LAST_EDITED_LOCAL := "last_edited_local"
 const KEY_VERSION := "iihexmm_version"
 const KEY_UNIQUE_TILES := "unique_tile_count"

@@ -12,354 +12,645 @@
 using namespace godot;
 
 namespace ImportExportModule {
+
     /**
-     * @brief Godot node that imports glTF and sidecar files into a hex asset pack, updates the manifest, and
-     *        deduplicates matching files after copy.
-     *
-     * When the import state is Copying, work is time-sliced in process using a per-frame microsecond budget.
-     * JSON keys follow the string table M_MANIFEST_JSON_KEY_STRINGS in constant.h.
+ * @brief Time-sliced importer Node for pack import, selective removal, or pack repair.
+ * @details Exactly one setup* call per instance; call queue_free() when the FSM stops or enters Destruct.
      */
     class Importer : public Node {
         GDCLASS(Importer, Node)
 
-        private :
+    private:
 
-            /**
-             * @brief Coarse FSM: idle, failed setup, time-sliced file copy, or handoff to post-import.
-            **/
-            enum class E_ImporterState { Waiting, Destruct, Copying, Picturing };
+        //! Coarse operational mode driving the _process dispatch.
+        enum class E_ImporterState {
+            Waiting, Destruct, Copying, Picturing, RemovingAssets, RepairingPack,
+        };
 
-            /**
-             * @brief Gltf copy queue, then sidecar copies, then manifest deduplication in one frame slice.
-            **/
-            enum class E_CopySubPhase { Gltf, Sidecar, Dedup, SubDone };
+        //! Sub-phase sequencing within the Copying workflow.
+        enum class E_CopySubPhase { Gltf, Sidecar, Dedup };
 
-            Dictionary m_assetsPackManifest;                 //!< In-memory pack manifeste.json: assets_data, bin_data, texture_data, groups.
-            E_ImporterState m_importerState;                 //!< FSM, see E_ImporterState.
-            E_CopySubPhase m_copySubPhase;                   //!< Gltf / sidecar / dedup sub-phase, see E_CopySubPhase.
-            String m_assetPackPath;                          //!< Target asset pack root directory.
-            String m_importRootWithSlash;                    //!< Source root with a trailing slash for true_path resolution.
+        //! Sub-phase sequencing within the RemovingAssets workflow.
+        enum class E_RemoveSubPhase {
+            ListedAssetsAndDrainDeletions, PruneSidecarsEnqueueDeletes,
+            DrainAfterSidecarPrune, RecomputeAndWriteManifest, SubDone,
+        };
 
-            Ref<PackedScene> m_importerPictureMakerScene;   //!< Preloaded ImporterPictureMaker scene (smoke-tested in _ready).
-            /** glTFs under the pack to capture: filled during import, pruned in deduplicateGltfAssetsInManifest, then
-             *  paths are remove_at(0) when given to a picture maker. */
-            Array m_gltfAssetsToCapturePath;
-            /** Pool nodes available for a new makeAPicture. */
-            Array m_idlePictureMakers;
-            /** Assigned a path, must be stepped (one step per frame). */
-            Array m_activePictureMakers;
+        //! Sub-phase sequencing within the RepairingPack workflow.
+        enum class E_RepairSubPhase {
+            BuildOrphanGltfList, ResolveOrphanGltfSlice, CollectMissingThumbnailsList,
+            PrepareDedupNonGltf, DedupCloneGroupsIterate, PrepareDedupGltfManifest,
+            CollectDeletionCandidates, ExecuteDeletionQueue, BeginThumbnailGeneration,
+            FinalizeRepairWrite, SubDone,
+        };
 
-            Array m_plannedGltfItems;                       //!< Per-file plan rows: source, pack name, uri_to_pack, gltf_size, group, etc.
-            Array m_plannedSidecarItems;                    //!< Sidecar work items: source, pack_name, true_path, is_bin, size.
-            uint64_t m_plannedNewBytes;                     //!< Total bytes to copy; used for the disk check in buildImportPlan and checkDiskSpace.
+        //! Pack-relative deletion backlog with deduplication guard.
+        struct S_DeletionQueue {
+            Array      queue; //!< Ordered list of pack-relative paths pending deletion.
+            Dictionary seen;  //!< Set of already-enqueued paths to prevent duplicates.
+        };
+
+        //! Transient state owned by the Copying workflow.
+        struct S_CopyCtx {
+            E_CopySubPhase subPhase   = E_CopySubPhase::Gltf; //!< Current step within the copy pipeline.
+            Array          plannedGltf;                        //!< Remaining glTF items to copy, each a Dictionary.
+            Array          plannedSidecar;                     //!< Remaining sidecar items to copy, each a Dictionary.
+            uint64_t       newBytes   = 0;                     //!< Estimated total bytes to be added to the pack.
+        };
+
+        //! Transient state owned by the Picturing (thumbnail) workflow.
+        struct S_PicturingCtx {
+            Array            toCapture;                                  //!< Absolute glTF paths awaiting thumbnail capture.
+            Array            idle;                                       //!< ImporterPictureMaker instances ready to accept work.
+            Array            active;                                     //!< ImporterPictureMaker instances currently rendering.
+            bool             followsRepair = false;                      //!< True when picturing was spawned from a repair pass.
+            E_RepairSubPhase returnPhase   = E_RepairSubPhase::SubDone;  //!< Phase to resume in RepairingPack after picturing finishes.
+        };
+
+        //! Transient state owned by the RemovingAssets workflow.
+        struct S_RemoveCtx {
+            E_RemoveSubPhase subPhase = E_RemoveSubPhase::SubDone; //!< Current step within the removal pipeline.
+            S_DeletionQueue  deletions;                            //!< Deletion backlog accumulated during the remove pass.
+            Array            gltfKeys;                             //!< Pack-relative glTF filenames scheduled for removal.
+        };
+
+        //! Transient state owned by the RepairingPack workflow.
+        struct S_RepairCtx {
+            E_RepairSubPhase subPhase        = E_RepairSubPhase::SubDone; //!< Current step within the repair pipeline.
+            S_DeletionQueue  deletions;                                   //!< Deletion backlog accumulated during the repair pass.
+            Array            workQueue;                                   //!< General-purpose per-step work list (orphan gltf names, etc.).
+            Array            thumbnailQueue;                              //!< Absolute glTF paths needing a thumbnail after repair.
+            Array            sizeBuckets;                                 //!< Candidate dedup groups, each a Dictionary with "names" and "_j".
+            int64_t          dedupIdx        = 0;                         //!< Index into sizeBuckets currently being processed.
+            bool             dedupIsGltfWave = false;                     //!< True during the glTF-manifest dedup wave, false for sidecar wave.
+        };
+
+        Dictionary       m_assetsPackManifest;         //!< Loaded root of manifeste.json, mutated in RAM.
+        E_ImporterState  m_importerState;              //!< Current coarse FSM selector.
+        String           m_assetPackPath;              //!< Absolute pack root on disk.
+        String           m_importSourceRoot;           //!< Absolute import tree root for true_path derivation.
+        Ref<PackedScene> m_importerPictureMakerScene;  //!< Cached scene resource used to instantiate ImporterPictureMaker nodes.
+        double           m_timeBudget;                 //!< Microsecond budget remaining for the current frame slice.
+        S_CopyCtx        m_copy;                       //!< Live context for the Copying workflow.
+        S_PicturingCtx   m_picturing;                  //!< Live context for the Picturing workflow.
+        S_RemoveCtx      m_remove;                     //!< Live context for the RemovingAssets workflow.
+        S_RepairCtx      m_repair;                     //!< Live context for the RepairingPack workflow.
 
         protected:
             /**
-             * @brief Binds methods exposed to Godot.
-            **/
+             * @brief Registers GDScript-callable methods with the Godot ClassDB.
+             */
             static void _bind_methods();
 
         public:
-
             /**
-             * @brief Constructor of the node.
-            **/
+             * @brief Initialises member variables to safe defaults.
+             */
             Importer();
 
             /**
-             * @brief Destructor.
-            **/
+             * @brief Default destructor.
+             */
             ~Importer();
 
             /**
-             * @brief Called when the node enters the scene tree.
-            **/
+             * @brief Godot ready callback — loads and validates the ImporterPictureMaker scene resource.
+             */
             void _ready();
 
             /**
-             * @brief Drives the Gltf, sidecar, and deduplication sub-phases while the importer is in the Copying state.
-             * @param p_delta Elapsed time since the previous frame.
-             * @details Advances Gltf copy, then sidecar copy, then the deduplication and manifest write in SubDone, using one shared us budget for Gltf and sidecar in the same call.
-            **/
+             * @brief Godot process callback — advances the active FSM state by one time-sliced step.
+             * @param p_delta Frame delta in seconds (unused; budget is derived from target FPS).
+             */
             void _process(double p_delta);
 
             /**
-             * @brief Loads the pack manifest, lists gltf files under the import path, builds the import plan, and starts copying.
-             * @param p_assetPackPath Path to the asset pack root.
-             * @param p_importAssetsPath Path to the folder of assets to import.
-             * @return True if the manifest is valid, gltfs are found, the plan and disk check succeed, and the Copying state is entered.
-            **/
+             * @brief Prepares asynchronous import of glTF files discovered under p_importAssetsPath.
+             * @param p_assetPackPath    Absolute path to the target asset pack root directory.
+             * @param p_importAssetsPath Absolute path to the source tree containing glTF files.
+             * @return False when prerequisites fail synchronously; the importer is queued for deletion.
+             */
             bool setupImportNewAssets(const String& p_assetPackPath, const String& p_importAssetsPath);
 
             /**
-             * @brief Placeholder: import from an IIHexMap export bundle (not implemented).
-             * @param p_importAssetsPath Reserved for future use.
-             * @return Always false for now.
-            **/
-            bool setupImportIIHexMapExportContent(const String& p_importAssetsPath);
-
-            /**
-             * @brief Placeholder: repair a damaged pack (not implemented).
-             * @param p_assetsPackPath Reserved for future use.
-             * @return Always false for now.
-            **/
+             * @brief Validates manifest snapshot then drives integrity repair asynchronously.
+             * @param p_assetsPackPath Absolute path to the asset pack root directory.
+             * @return False when prerequisites fail synchronously; the importer is queued for deletion.
+             */
             bool setupRepareAssetsPack(const String& p_assetsPackPath);
 
+            /**
+             * @brief Queues deterministic removal steps for the listed assets_data keys.
+             * @param p_assetPackPath      Absolute path to the asset pack root directory.
+             * @param p_packGltfFileNames  Array of String pack-relative glTF filenames to remove.
+             * @return False when nothing schedulable remains or validation fails.
+             */
+            bool setupRemoveAssetsFromPack(const String& p_assetPackPath, const Array& p_packGltfFileNames);
+
         private:
+            // ── Manifest helpers ──────────────────────────────────────────────────────
 
             /**
-             * @brief Recursively lists gltf files under a path, up to FILE_MANIPULATION_MAX_DEEP.
-             * @param p_importPath File or directory to scan.
-             * @param p_gltfList In/out: absolute paths of glTF files.
-             * @param p_currentDeep Current recursion depth.
-             * @return True if the path was readable; false on depth limit or list failure.
-            **/
-            const bool assetsImporterCalulation(const String& p_importPath, Array& p_gltfList, int p_currentDeep);
+             * @brief Returns the assets_data Dictionary from the manifest, or an empty one.
+             */
+            const Dictionary manifestAssetsDict();
 
             /**
-             * @brief Fills the planned Gltf and sidecar work lists, then runs the disk space check.
-             * @param p_gltfSourceList List of absolute paths to every gltf to import in this run.
-             * @return True if a non-empty plan is built and there is enough disk space.
-            **/
-            const bool buildImportPlan(const Array& p_gltfSourceList);
+             * @brief Returns the bin_data Dictionary from the manifest, or an empty one.
+             */
+            const Dictionary manifestBinDict();
 
             /**
-             * @brief Resolves one uri, updates planned sidecar copies, or reuses a matching row in the manifest.
-             * @param p_gltfSrc Absolute path to the source gltf file.
-             * @param p_uri The uri string from the gltf JSON.
-             * @param p_isBuffer True for buffers, false for images.
-             * @param p_srcToPack In/out: maps resolved absolute file path to pack file name for this import run.
-             * @param p_reserved In/out: names already taken for this run.
-             * @return True after handling the uri; the current implementation does not return false.
-            **/
-            bool planOneSidecar(
-                const String& p_gltfSrc, const String& p_uri, bool p_isBuffer, Dictionary& p_srcToPack, Dictionary& p_reserved);
+             * @brief Returns the texture_data Dictionary from the manifest, or an empty one.
+             */
+            const Dictionary manifestTexDict();
 
             /**
-             * @brief Returns whether the pack root has enough free space to copy the requested size (with a small margin when reported free space is tight).
-             * @param p_needBytes Total byte size the import intends to add.
-             * @return True if free space is unknown or large enough, false if definitely insufficient.
-            **/
-            const bool checkDiskSpace(uint64_t p_needBytes);
+             * @brief Returns the groups Array from the manifest, or an empty one.
+             */
+            const Array manifestGroupsArray();
 
             /**
-             * @brief Copies one glTF, rewrites uris in the JSON, and appends a row in assets_data and the capture list.
-             * @param p_item One planned gltf item dictionary from the build step.
-             * @return True on successful copy, rewrite, and manifest update.
-            **/
-            const bool copyGltfPlannedItem(const Dictionary& p_item);
-
-            /**
-             * @brief Inserts or updates a row in assets_data and the groups list when the group is new.
-             * @param p_item Same shape as a planned item after copy (pack name, true_path, group, size, bin/texture dicts).
-            **/
-            void recordGltfRowInManifest(const Dictionary& p_item);
-
-            /**
-             * @brief Spends the shared per-frame time budget to copy a chunk of planned sidecar files.
-             * @param io_timeBudgetUsec In/out: remaining time for this frame, in microseconds.
-             * @return True while work may continue; false on copy failure.
-            **/
-            const bool runSidecarPhaseSlice(double& io_timeBudgetUsec);
-
-            /**
-             * @brief Sidecar and gltf deduplication, then recompute pack weights and write manifeste.json to disk.
-             * @return True when dedup, recompute, and write succeed; always true on success in current implementation.
-            **/
-            const bool runDedupAndFinish();
-
-            /**
-             * @brief Merges duplicate bin_data and texture_data rows for the same on-disk file content.
-            **/
-            void deduplicateSidecarsInManifest();
-
-            /**
-             * @brief Deduplication pass for a single table name (bin_data or texture_data).
-             * @param p_tableName Either bin_data or texture_data.
-            **/
-            void deduplicateOneSidecarTable(const String& p_tableName);
-
-            /**
-             * @brief Merges duplicate glTF in assets_data when true_path and sub-dictionaries match and file bytes match.
-            **/
-            void deduplicateGltfAssetsInManifest();
-
-            /**
-             * @brief Sums the weight field over assets_data, bin_data, and texture_data.
-             * @return Total weight in bytes for all manifest row tables that define weight.
-            **/
-            uint64_t computeTotalWeightBytes();
-
-            /**
-             * @brief Refreshes poid_bytes, poid, and asset in the in-memory manifest.
-            **/
-            void recomputeGlobalSizesAndCount();
-
-            /**
-             * @brief Serializes the manifest to manifeste.json and sets the date field.
-            **/
-            void writeManifestToDisk();
-
-            /**
-             * @brief Ensures assets_data, bin_data, texture_data, and groups exist in the in-memory manifest.
-            **/
+             * @brief Inserts default empty tables into the manifest if they are absent.
+             */
             void ensureManifestDefaultTables();
 
             /**
-             * @brief Returns whether the pack manifest has the required top-level keys.
-             * @param p_manifest The dictionary loaded from manifeste.json.
-             * @return True if all required keys are present.
-            **/
+             * @brief Returns true if the manifest contains the four required top-level keys.
+             * @param p_manifest Dictionary to validate.
+             */
             const bool isAssetsPackManifestValid(const Dictionary& p_manifest);
 
             /**
-             * @brief Reads a JSON file from disk; returns a dictionary or an empty one on error.
-             * @param p_path Full path to a text JSON file.
-             * @return A dictionary on success, or an empty dictionary if missing, invalid JSON, or not a dict root.
-            **/
+             * @brief Serialises m_assetsPackManifest to disk as pretty-printed JSON.
+             * @return False on file-open failure.
+             */
+            const bool writeManifestToDisk();
+
+            /**
+             * @brief Optionally prunes empty groups, recomputes sizes, then writes the manifest.
+             * @param p_prune_empty_groups Remove group entries no longer referenced by any asset.
+             * @return False on write failure.
+             */
+            const bool commitPackManifestToDisk(bool p_prune_empty_groups);
+
+            /**
+             * @brief Loads and validates the manifest from disk; sets Destruct state on failure.
+             * @param p_pack_root  Absolute path to the pack root directory.
+             * @param p_context    Human-readable context string used in error messages.
+             * @return False if the file is missing, unparseable, or lacks required keys.
+             */
+            const bool loadPackManifestFromDiskOrDestruct(const String& p_pack_root, const String& p_context);
+
+            /**
+             * @brief Reads and parses a JSON file, returning its root Dictionary.
+             * @param p_path Absolute path to the JSON file.
+             * @return Empty Dictionary on any failure (missing file, parse error, wrong type).
+             */
             const Dictionary getDictionaryFromJsonPath(const String& p_path);
 
             /**
-             * @brief Records every key of a dictionary in the reserved-name set for unique naming.
-             * @param p_dict Table whose keys (file names) are added to the reserved set.
-             * @param p_outReserved In/out: reserved set updated in place.
-            **/
-            void addDictionaryKeysToReserved(const Dictionary& p_dict, Dictionary& p_outReserved);
+             * @brief Deduplicates sidecar tables and glTF assets, then commits the manifest.
+             * @param p_prune_empty_groups Forwarded to commitPackManifestToDisk.
+             * @return False on write failure.
+             */
+            const bool runFullManifestSidecarAndGltfDedupCommit(bool p_prune_empty_groups);
 
             /**
-             * @brief Collects existing on-disk file names in the pack and keys from manifest tables to avoid name clashes.
-             * @param p_reserved In/out: maps reserved name key to a truthy flag.
-            **/
-            void collectReservedNamesFromPack(Dictionary& p_reserved);
+             * @brief Updates poid_bytes, poid (human-readable MB string), and asset count in the manifest.
+             */
+            void recomputeGlobalSizesAndCount();
 
             /**
-             * @brief Returns a path relative to the import root (forward slashes) or the file name only.
-             * @param p_abs An absolute file path in the import space.
-             * @return A relative true path string, or the file name only.
-            **/
-            const String toImportRootRelativePath(const String& p_abs);
+             * @brief Sums weight bytes across all three manifest tables.
+             * @return Total size in bytes.
+             */
+            const uint64_t computeTotalWeightBytes();
 
             /**
-             * @brief Subdirectory of the import tree used as the group field for a source glTF (may be empty).
-             * @param p_srcGltfPath Absolute path to a gltf under the import root.
-             * @return A relative subfolder for grouping, or an empty string for files at the import root.
-            **/
-            const String groupPathForSourceGltf(const String& p_srcGltfPath);
+             * @brief Removes group entries from the manifest that are not referenced by any asset row.
+             */
+            void pruneEmptyGroupsInManifest();
 
             /**
-             * @brief Picks a file name that is not already in the reserved set, possibly with a numeric suffix.
-             * @param p_preferred Preferred file name to try first.
-             * @param p_reserved In/out: reserved set updated when a new name is taken.
-             * @return A unique name registered in the reserved set.
-            **/
-            const String makeUniqueNameInSet(const String& p_preferred, Dictionary& p_reserved);
+             * @brief Merges duplicate sidecar entries in one table using binary file equality.
+             * @param p_table_name Manifest key of the table to process (BIN_DATA_KEY or TEX_DATA_KEY).
+             */
+            void deduplicateOneSidecarTable(const String& p_table_name);
 
             /**
-             * @brief True if a sidecar with the same true_path and size is already in the pack tables.
-             * @param p_truePathRel True path of the file relative to the import root, forward slashes.
-             * @param p_size File size in bytes to match the weight field.
-             * @param p_isBin True to search bin_data, false to search texture_data.
-             * @param p_outName Out: pack file name if a row matches; unchanged if false.
-             * @return True if a matching row exists; false otherwise.
-            **/
-            const bool fileExistsInPackByTruePath(
-                const String& p_truePathRel, uint64_t p_size, bool p_isBin, String& p_outName);
+             * @brief Iteratively merges duplicate glTF asset entries in the manifest using content equality.
+             */
+            void deduplicateGltfAssetsInManifest();
 
             /**
-             * @brief Suggests a new pack file name (with extension) for a new sidecar, unique in the reserved set.
-             * @param p_sourceAbs Absolute path to the source file on disk.
-             * @param p_isBin True for a buffer, false for a texture.
-             * @param p_size File size; kept for call symmetry (may be unused for naming).
-             * @param p_reserved In/out: set of names already in use.
-             * @return A new file name in the pack, unique in the reserved set.
-            **/
-            const String pickPackNameForNewSidecar(
-                const String& p_sourceAbs, bool p_isBin, uint64_t p_size, Dictionary& p_reserved);
+             * @brief Splits an asset row into its embedded bin and texture sidecar maps.
+             * @param p_row      Source asset row Dictionary.
+             * @param p_out_bin  Receives the bin sub-Dictionary.
+             * @param p_out_tex  Receives the texture sub-Dictionary.
+             */
+            void extractBinTexMapsFromAssetRow(const Dictionary& p_row, Dictionary& p_out_bin, Dictionary& p_out_tex);
 
             /**
-             * @brief Appends buffer or image uris from one root array in the glTF JSON when the uri maps to a local file.
-             * @param p_root Parsed gltf root dictionary.
-             * @param p_key Json key for the array, typically buffers or images.
-             * @param p_isBuffer True to tag entries as buffer sidecars, false for images.
-             * @param r_out In/out: array of small uri plan entries appended to the list.
-            **/
-            void appendGltfJsonSectionUris(const Dictionary& p_root, const char* p_key, bool p_isBuffer, Array& r_out);
+             * @brief Populates p_out_allow with all pack filenames referenced by the manifest.
+             * @param p_out_allow Output Dictionary used as a set (key = filename, value = true).
+             */
+            void buildAllowedReferencedPackFilenames(Dictionary& p_out_allow);
 
             /**
-             * @brief Fills a list of uri entries from the buffers and images lists, and optionally a sibling bin next to the gltf.
-             * @param p_srcGltf Absolute path to the gltf.
-             * @param p_root Parsed gltf root.
-             * @param p_adjAbs Absolute path to a sibling co-located bin if present, else empty.
-             * @param p_hasAdj True if p_adjAbs should be considered.
-             * @param r_out In/out: uri and is_buffer list.
-             * @return Always true; reserved for error propagation.
-            **/
-            const bool collectGltfUris(
-                const String& p_srcGltf, const Dictionary& p_root, const String& p_adjAbs, bool p_hasAdj, Array& r_out);
+             * @brief Builds a stable fingerprint string for a sidecar sub-Dictionary.
+             * @param p_dict Dictionary whose entries are sorted and serialised.
+             * @return Canonical string of the form "key=value;…".
+             */
+            const String fingerprintManifestSidecarDict(const Dictionary& p_dict);
 
             /**
-             * @brief True for empty, data, or non-file uris.
-             * @param p_uri A uri from gltf.
-             * @return True if the uri cannot be mapped to a local file to copy.
-            **/
-            const bool gltfUriCannotMapToLocalFile(const String& p_uri);
+             * @brief Inserts a sidecar row into the given manifest table if the key is absent.
+             * @param p_table      Manifest key of the target table (BIN_DATA_KEY or TEX_DATA_KEY).
+             * @param p_key        Pack-relative filename used as the row key.
+             * @param p_true_path  Relative import-source path stored in the row.
+             * @param p_weight     File size in bytes.
+             */
+            void ensureManifestSidecarRow(const String& p_table, const String& p_key, const String& p_true_path, int64_t p_weight);
 
             /**
-             * @brief Resolves a glTF uri to an absolute path next to the source gltf file.
-             * @param p_srcGltfPath Where the gltf lives on disk.
-             * @param p_uri A uri from the gltf.
-             * @return Absolute file path, or an empty string if the uri is not a local file reference.
-            **/
-            const String resolveGltfUriToAbsoluteFile(const String& p_srcGltfPath, const String& p_uri);
+             * @brief Builds a minimal sidecar row Dictionary with true_path and weight fields.
+             * @param p_true_path Relative import-source path.
+             * @param p_weight    File size in bytes.
+             * @return New sidecar row Dictionary.
+             */
+            const Dictionary makeSidecarRow(const String& p_true_path, int64_t p_weight);
 
             /**
-             * @brief Produces a JSON-quoted string token for search and replace in gltf text, same rules as JSON stringify.
-             * @param p_unescaped File name or string as it should appear in JSON.
-             * @return A quoted string token for byte-for-byte find in a gltf text.
-            **/
-            const String gltfJsonQuotedStringToken(const String& p_unescaped);
+             * @brief Writes an asset row into the manifest's assets_data table and updates the groups list.
+             * @param p_item Dictionary describing the imported glTF (pack_name, true_path, group, gltf_size, bin, texture).
+             */
+            void recordGltfRowInManifest(const Dictionary& p_item);
+
+            // ── Setup helpers ─────────────────────────────────────────────────────────
 
             /**
-             * @brief Maps a manifest field enum to the Godot String used as a dictionary key.
-             * @param p_key Which manifest key string to return.
-             * @return The Godot String for use as a key in a Dictionary.
-            **/
-            const String manifest_key_gd(const E_ManifestJsonKey p_key) const;
+             * @brief Logs p_msg as an error, enters Destruct state, queues deletion, and returns false.
+             * @param p_msg Error message to emit.
+             * @return Always false.
+             */
+            const bool failSetup(const String& p_msg);
+
+            // ── Copy phase ────────────────────────────────────────────────────────────
 
             /**
-             * @brief Deduplicates old-to-new name pairs, sorts by string length, then rewrites the file text in one pass.
-             * @param p_text In/out: gltf file body as text, rewritten in place.
-             * @param p_uriToName Maps each old uri to the pack file name to substitute.
-            **/
-            void sortDedupAndApplyUriStrings(String& p_text, const Dictionary& p_uriToName);
+             * @brief Recursively collects .gltf file paths under p_import_path up to the depth limit.
+             * @param p_import_path  Absolute path to scan (may be a file or directory).
+             * @param p_gltf_list    Accumulator Array receiving absolute .gltf paths.
+             * @param p_current_deep Current recursion depth, checked against FILE_MANIPULATION_MAX_DEEP.
+             * @return False if depth is exceeded or a directory cannot be opened.
+             */
+            const bool enumerateGltfUnderImportPath(const String& p_import_path, Array& p_gltf_list, int p_current_deep);
 
             /**
-             * @brief True if two files have the same length and equal bytes for that length.
-             * @param p_pathA First file path in the pack or elsewhere.
-             * @param p_pathB Second file path in the pack or elsewhere.
-             * @return True if both exist, same size, and content matches.
-            **/
-            const bool fileBinaryEqual(const String& p_pathA, const String& p_pathB);
+             * @brief Builds m_copy.plannedGltf and m_copy.plannedSidecar from a list of source glTF paths.
+             * @param p_gltf_source_list Array of absolute .gltf source paths to plan.
+             * @return False on IO error, JSON parse failure, or insufficient disk space.
+             */
+            const bool buildImportPlan(const Array& p_gltf_source_list);
 
             /**
-             * @brief Shallow dictionary equality: same keys and operator== for each value.
-             * @param p_a First dictionary.
-             * @param p_b Second dictionary.
-             * @return True if the two dictionaries are shallow-equal.
-            **/
+             * @brief Plans the copy of one sidecar referenced by a glTF URI entry.
+             * @param p_gltf_src    Absolute path to the owning .gltf file.
+             * @param p_uri_row     Dictionary with "uri" and "is_buffer" fields.
+             * @param p_src_to_pack Accumulated source→pack-name mapping (in/out).
+             * @param p_reserved    Set of already-reserved pack filenames (in/out).
+             * @return False on IO error.
+             */
+            const bool planOneSidecar(const String& p_gltf_src, const Dictionary& p_uri_row, Dictionary& p_src_to_pack, Dictionary& p_reserved);
+
+            /**
+             * @brief Checks whether the pack volume has sufficient free space for the estimated import.
+             * @param p_need_bytes Estimated bytes required.
+             * @return False if disk space is insufficient.
+             */
+            const bool checkDiskSpace(uint64_t p_need_bytes);
+
+            /**
+             * @brief Copies a planned glTF item to the pack and records it in the manifest.
+             * @param p_item Dictionary produced by buildImportPlan describing one glTF.
+             * @return False on file copy failure.
+             */
+            const bool copyGltfPlannedItem(const Dictionary& p_item);
+
+            /**
+             * @brief Drains m_copy.plannedSidecar within the current time budget.
+             * @return False on copy failure; advances subPhase to Dedup when the list is empty.
+             */
+            const bool runSidecarPhaseSlice();
+
+            /**
+             * @brief Runs sidecar and glTF deduplication, writes the manifest, then transitions to Picturing.
+             * @return False if the manifest write fails.
+             */
+            const bool runDedupAndFinish();
+
+            /**
+             * @brief Advances the copy FSM (Gltf → Sidecar → Dedup) within the frame budget.
+             */
+            void progressImportCopyStateForFrame();
+
+            /**
+             * @brief Copies a sidecar file to the pack and records or updates its manifest row.
+             * @param p_source    Absolute source path.
+             * @param p_pack_name Pack-relative destination filename.
+             * @param p_true_path Relative import-source path stored in the manifest.
+             * @param p_is_bin    True for .bin buffer, false for texture.
+             * @param p_size      File size in bytes.
+             * @return False on file copy failure.
+             */
+            const bool copySidecarToPackAndRecord(const String& p_source, const String& p_pack_name, const String& p_true_path, bool p_is_bin, int64_t p_size);
+
+            // ── Picturing phase ───────────────────────────────────────────────────────
+
+            /**
+             * @brief Advances thumbnail capture: spawns workers, ticks active ones, dispatches queued paths.
+             */
+            void runPicturingPhase();
+
+            // ── Remove phase ──────────────────────────────────────────────────────────
+
+            /**
+             * @brief Drives the RemovingAssets FSM sub-phases within the frame budget.
+             */
+            void runRemovingAssetsSlice();
+
+            /**
+             * @brief Enqueues a pack-relative path into the remove-phase deletion backlog.
+             * @param p_rel Pack-relative path to delete.
+             */
+            void removeEnqueueDeletionRel(const String& p_rel);
+
+            /**
+             * @brief Removes sidecar manifest rows with zero asset references and enqueues their files.
+             * @param p_dq Deletion queue to receive unreferenced sidecar filenames.
+             */
+            void pruneUnreferencedSidecarsAndEnqueue(S_DeletionQueue& p_dq);
+
+            // ── Repair phase ──────────────────────────────────────────────────────────
+
+            /**
+             * @brief Drives the RepairingPack FSM sub-phases within the frame budget.
+             */
+            void runRepairPackSlice();
+
+            /**
+             * @brief Enqueues a pack-relative path into the repair-phase deletion backlog.
+             * @param p_rel Pack-relative path to delete.
+             */
+            void repairEnqueueDeletionRel(const String& p_rel);
+
+            /**
+             * @brief Attempts to integrate an orphan glTF (on disk but absent from manifest) into the manifest.
+             * @param p_pack_gltf_name Pack-relative filename of the orphan glTF.
+             * @return True (always continues repair); the file is enqueued for deletion if unrecoverable.
+             */
+            const bool repairTryAdoptOrphanGltf(const String& p_pack_gltf_name);
+
+            /**
+             * @brief Populates m_repair.thumbnailQueue with glTF paths that are missing their capture PNG.
+             */
+            void repairFillThumbnailQueueFromManifest();
+
+            /**
+             * @brief Builds m_repair.sizeBuckets grouping non-glTF pack files by extension and size.
+             */
+            void repairBuildNonGltfExtensionSizeBuckets();
+
+            /**
+             * @brief Builds m_repair.sizeBuckets grouping glTF entries by weight and sidecar fingerprint.
+             */
+            void repairBuildManifestGltfWeightSideBuckets();
+
+            /**
+             * @brief Processes one dedup step across m_repair.sizeBuckets.
+             * @return True while work remains in the current bucket set; false when all buckets are exhausted.
+             */
+            const bool repairDedupCloneGroupsOneStep();
+
+            /**
+             * @brief Collects unreferenced pack files and stale capture PNGs into the repair deletion queue.
+             */
+            void repairCollectDeletionCandidates();
+
+            /**
+             * @brief Transitions to Picturing state if thumbnails are pending, otherwise finalises repair directly.
+             */
+            void repairBeginThumbnailGeneration();
+
+            /**
+             * @brief Final repair step: runs full dedup and writes the manifest to disk.
+             */
+            void repairFinalizeAfterRepairWrite();
+
+            /**
+             * @brief Updates only the _j field of a size bucket in-place.
+             * @param p_bucket Bucket Dictionary to update.
+             * @param p_jj     New value for the _j iterator field.
+             */
+            void repairDedupPersistJjOnly(Dictionary& p_bucket, int64_t p_jj);
+
+            /**
+             * @brief Writes updated names and _j back into a size bucket in-place.
+             * @param p_bucket Bucket Dictionary to update.
+             * @param p_names  Updated names Array.
+             * @param p_jj     New value for the _j iterator field.
+             */
+            void repairDedupPersistBucket(Dictionary& p_bucket, const Array& p_names, int64_t p_jj);
+
+            /**
+             * @brief Merges two duplicate glTF pack files by removing p_drop from the manifest and from disk.
+             * @param p_keep          Pack-relative name of the file to retain.
+             * @param p_drop          Pack-relative name of the file to discard.
+             * @param p_defer_delete  If true, enqueues deletion; otherwise deletes immediately.
+             * @param p_already_equal Skip the binary equality check (caller guarantees equality).
+             * @return False if either file is absent from the manifest or the files are not binary-equal.
+             */
+            const bool mergeRepairDuplicateGltfPackFiles(const String& p_keep, const String& p_drop, bool p_defer_delete, bool p_already_equal);
+
+            /**
+             * @brief Redirects all asset references from p_drop to p_keep in one sidecar table.
+             * @param p_table        Manifest table key (BIN_DATA_KEY or TEX_DATA_KEY).
+             * @param p_keep         Sidecar filename to retain.
+             * @param p_drop         Sidecar filename to discard.
+             * @param p_defer_delete If true, enqueues deletion; otherwise deletes immediately.
+             */
+            void mergeRepairPackSidecarsInTable(const String& p_table, const String& p_keep, const String& p_drop, bool p_defer_delete);
+
+            /**
+             * @brief Fills p_out_base_names with the .gltf base filenames found at the pack root.
+             * @param p_out_base_names Output Array receiving base filenames.
+             */
+            void listPackRootGltfFileNames(Array& p_out_base_names);
+
+            // ── Shared low-level helpers ──────────────────────────────────────────────
+
+            /**
+             * @brief Adds a normalised pack-relative path to a deletion queue, guarding against duplicates.
+             * @param p_dq  Deletion queue to append to.
+             * @param p_rel Raw pack-relative path (may contain backslashes or a leading slash).
+             */
+            void enqueuePackRelativeDeletionRel(S_DeletionQueue& p_dq, const String& p_rel);
+
+            /**
+             * @brief Deletes files from p_dq.queue one by one within the remaining time budget.
+             * @param p_dq Deletion queue to drain.
+             */
+            void drainPackRelativeDeletionQueueSlice(S_DeletionQueue& p_dq);
+
+            /**
+             * @brief Deletes a single file identified by its pack-relative path.
+             * @param p_rel_pack_path Pack-relative path (leading slashes and backslashes are normalised).
+             */
+            void deletePackRelativeFile(const String& p_rel_pack_path);
+
+            /**
+             * @brief Lists all files (non-recursive) in a directory.
+             * @param p_abs_path      Absolute directory path to enumerate.
+             * @param p_out_filenames Output Array receiving base filenames (no directory prefix).
+             */
+            void enumerateFilesInDirNonRecursive(const String& p_abs_path, Array& p_out_filenames);
+
+            /**
+             * @brief Subtracts elapsed microseconds since p_slice_start_usec from m_timeBudget.
+             * @param p_slice_start_usec Tick value captured before the work slice began.
+             */
+            void debitTimeBudgetFromTicks(uint64_t p_slice_start_usec);
+
+            /**
+             * @brief Performs a chunk-by-chunk binary comparison of two files.
+             * @param p_path_a Absolute path to the first file.
+             * @param p_path_b Absolute path to the second file.
+             * @return True only if both files exist, have the same length, and are byte-identical.
+             */
+            const bool fileBinaryEqual(const String& p_path_a, const String& p_path_b);
+
+            /**
+             * @brief Shallow-compares two Dictionaries: same keys and Variant-equal values.
+             * @param p_a First Dictionary.
+             * @param p_b Second Dictionary.
+             * @return True if both Dictionaries have identical key/value pairs.
+             */
             const bool dictEqualShallow(const Dictionary& p_a, const Dictionary& p_b);
 
             /**
-             * @brief Replaces a JSON-quoted old file name with a new one in a file when the old token is present.
-             * @param p_path File to read and write.
-             * @param p_oldName Old file base name in unescaped form, turned into a JSON token to find.
-             * @param p_newName New name in unescaped form, turned into a JSON token to write.
-             * @return True if read, optional replace, and write succeed.
-            **/
-            bool tryReplaceJsonQuotedStringInFile(const String& p_path, const String& p_oldName, const String& p_newName);
+             * @brief Replaces a JSON-quoted string literal in a text file if it appears at least once.
+             * @param p_path Path to the file to modify in-place.
+             * @param p_old  Unquoted original string value.
+             * @param p_new  Unquoted replacement string value.
+             * @return False on file IO failure; true if unchanged or successfully replaced.
+             */
+            const bool tryReplaceJsonQuotedStringInFile(const String& p_path, const String& p_old, const String& p_new);
 
-            void runPicturingPhase(double& io_timeBudgetUsec);
+            /**
+             * @brief Returns true if p_abs_path is equal to or is a child of m_assetPackPath.
+             * @param p_abs_path Absolute path to test.
+             */
+            const bool pathIsUnderPack(const String& p_abs_path);
 
-            bool isPicturingWorkDone();
+            /**
+             * @brief Computes the path of p_abs relative to m_importSourceRoot.
+             * @param p_abs Absolute path to convert.
+             * @return Relative path string, or just the filename if p_abs is outside the root.
+             */
+            const String toImportRootRelativePath(const String& p_abs);
+
+            /**
+             * @brief Derives the group subdirectory for a source glTF relative to the import root.
+             * @param p_src_gltf_path Absolute path to the source .gltf file.
+             * @return Group path string, empty if the file is directly under the import root.
+             */
+            const String groupPathForSourceGltf(const String& p_src_gltf_path);
+
+            /**
+             * @brief Returns p_preferred if not reserved, otherwise appends an incrementing _N suffix.
+             * @param p_preferred Desired filename.
+             * @param p_reserved  Set of already-taken names (in/out); the winner is added to the set.
+             * @return A unique filename not present in p_reserved.
+             */
+            const String makeUniqueNameInSet(const String& p_preferred, Dictionary& p_reserved);
+
+            /**
+             * @brief Chooses a unique pack filename for a sidecar to be copied.
+             * @param p_source_abs Absolute source path.
+             * @param p_is_bin     True for .bin buffer, false for texture.
+             * @param p_size       File size in bytes (reserved for future bucketing, currently unused).
+             * @param p_reserved   Set of already-taken pack names (in/out).
+             * @return Unique pack-relative base filename for the sidecar.
+             */
+            const String pickPackNameForNewSidecar(const String& p_source_abs, bool p_is_bin, uint64_t p_size, Dictionary& p_reserved);
+
+            /**
+             * @brief Searches the appropriate sidecar table for an entry matching true_path and size.
+             * @param p_true_path_rel Relative import-source path to match.
+             * @param p_size          File size in bytes to match.
+             * @param p_is_bin        Selects the bin or texture table.
+             * @param p_out_name      Receives the matching pack filename on success.
+             * @return True if a matching row is found.
+             */
+            const bool fileExistsInPackByTruePath(const String& p_true_path_rel, uint64_t p_size, bool p_is_bin, String& p_out_name);
+
+            /**
+             * @brief Populates p_reserved with all pack filenames that must not be overwritten.
+             * @param p_reserved Output Dictionary (key = filename, value = true).
+             * @details Covers keys from all three manifest tables plus files present on disk.
+             */
+            void collectReservedNamesFromPack(Dictionary& p_reserved);
+
+            /**
+             * @brief Appends URI descriptor rows for all buffers and images found in a glTF root.
+             * @param p_root         Parsed glTF root Dictionary.
+             * @param p_out_uri_rows Output Array; each entry is a Dictionary with "uri" and "is_buffer".
+             */
+            void appendGltfBuffersAndImagesUriRows(const Dictionary& p_root, Array& p_out_uri_rows);
+
+            /**
+             * @brief Returns true if the URI cannot be resolved to a local file (data URL, http, etc.).
+             * @param p_uri URI string from the glTF JSON.
+             */
+            const bool gltfUriCannotMapToLocalFile(const String& p_uri);
+
+            /**
+             * @brief Resolves a glTF-relative URI to an absolute filesystem path.
+             * @param p_src_gltf_path Absolute path to the owning .gltf file.
+             * @param p_uri           URI string from the glTF JSON.
+             * @return Absolute path, or empty string for non-local URIs.
+             */
+            const String resolveGltfUriToAbsoluteFile(const String& p_src_gltf_path, const String& p_uri);
+
+            /**
+             * @brief Deduplicates, sorts by descending URI length, and applies all URI replacements to p_text.
+             * @param p_text        Raw glTF JSON text to modify in-place.
+             * @param p_uri_to_name Map from original URI strings to their new pack filenames.
+             */
+            void sortDedupAndApplyUriStrings(String& p_text, const Dictionary& p_uri_to_name);
+
+            /**
+             * @brief Returns the pack-relative path of the capture PNG for a given glTF pack filename.
+             * @param p_gltf_filename Pack-relative glTF filename (e.g. "model.gltf").
+             * @return Path of the form "capture/<basename>.png".
+             */
+            const String packRelativeCapturePngForGltfPackName(const String& p_gltf_filename);
+
+            /**
+             * @brief Safely reads an int64_t from a Dictionary, returning 0 if the key is absent.
+             * @param p_dict Source Dictionary.
+             * @param p_key  Key to look up.
+             * @return Integer value, or 0 if absent.
+             */
+            const int64_t dictGetInt(const Dictionary& p_dict, const Variant& p_key);
+
+            /**
+             * @brief Appends p_val to an Array stored at p_key in p_dict, creating the Array if needed.
+             * @param p_dict Target Dictionary.
+             * @param p_key  String key whose value must be (or will become) an Array.
+             * @param p_val  Value to append.
+             */
+            void dictPushToArray(Dictionary& p_dict, const String& p_key, const Variant& p_val);
     };
 }

@@ -1,13 +1,13 @@
 extends Node3D
-## Scène de test pour l'import C++ (manifeste v2, chemins ajustables dans l'inspecteur).
+## Smoke-test scene for native C++ Import (manifest v2); paths are editable in the inspector.
 
 @export var target_pack_name: String = "newpack1"
-## Laisser vide pour utiliser `fallback_source_import_path` (KayKit) si le dossier existe.
+## Leave empty to use `fallback_source_import_path` instead (if that folder exists).
 @export var source_import_path: String = ""
-## Utilisé seulement quand `source_import_path` est vide.
+## Only used while `source_import_path` stays empty.
 @export var fallback_source_import_path: String = "C:/Users/lolou/Desktop/KayKit_Medieval_Hexagon_Pack_1.0_FREE/Assets/gltf"
 
-## Classe C++ enregistrée par la GDExtension (même identifiant que `GDCLASS(Importer, Node)`).
+## Matches the GDCLASS name registered via GDExtension (`Importer`).
 const NATIVE_IMPORTER_CLASS_NAME := "Importer"
 
 var _target_pack_path: String:
@@ -26,22 +26,22 @@ func _ready() -> void:
 	if src.is_empty():
 		src = fallback_source_import_path.strip_edges()
 	if src.is_empty():
-		push_error("[LabImporterTest] Aucun chemin d'import: renseignez `source_import_path` dans l'inspecteur.")
+		push_error("[LabImporterTest] Missing import source: set `source_import_path` or `fallback_source_import_path`.")
 		return
 	if not _path_is_reachable_dir_or_file(src):
-		push_error("[LabImporterTest] Chemin d'import introuvable: %s" % src)
+		push_error("[LabImporterTest] Import path not reachable: %s." % src)
 		return
 	if not _tree_contains_gltf(src):
-		push_error("[LabImporterTest] Aucun fichier .gltf sous: %s" % src)
+		push_error("[LabImporterTest] No `.gltf` file found under %s." % src)
 		return
 	if not ClassDB.class_exists(NATIVE_IMPORTER_CLASS_NAME):
 		push_error(
-			"[LabImporterTest] Classe « %s » absente. Chargez la GDExtension (cpp.dll) : extensions/ii_hex_map_maker.gdextension" % NATIVE_IMPORTER_CLASS_NAME
+			"[LabImporterTest] Class `%s` missing — load GDExtension `extensions/ii_hex_map_maker.gdextension` (cpp.dll)." % NATIVE_IMPORTER_CLASS_NAME
 		)
 		return
 	var importer: Node = ClassDB.instantiate(NATIVE_IMPORTER_CLASS_NAME) as Node
 	if importer == null:
-		push_error("[LabImporterTest] Impossible d'instancier l'importer natif.")
+		push_error("[LabImporterTest] Cannot instantiate native Importer.")
 		return
 	add_child(importer)
 	var ok: bool = (importer as Object).call("setupImportNewAssets", _target_pack_path, src) as bool
@@ -51,17 +51,17 @@ func _ready() -> void:
 func _ensure_user_pack_and_disk_manifest() -> void:
 	var da: DirAccess = DirAccess.open("user://")
 	if da == null:
-		push_error("[LabImporterTest] impossible d'ouvrir user://")
+		push_error("[LabImporterTest] Cannot open user://.")
 		return
 	if not da.dir_exists("Asset Packs"):
 		var e: int = da.make_dir_recursive("Asset Packs")
 		if e != OK and e != ERR_ALREADY_EXISTS:
-			push_error("[LabImporterTest] impossible de créer user://Asset Packs")
+			push_error("[LabImporterTest] Cannot create user://Asset Packs.")
 			return
 	if not da.dir_exists("Asset Packs/".path_join(target_pack_name)):
 		var e2: int = da.make_dir_recursive("Asset Packs/".path_join(target_pack_name))
 		if e2 != OK and e2 != ERR_ALREADY_EXISTS:
-			push_error("[LabImporterTest] impossible de créer le pack lab")
+			push_error("[LabImporterTest] Cannot create lab pack folder.")
 			return
 	if not FileAccess.file_exists(_manifest_path):
 		_write_fresh_manifest_file()
@@ -87,7 +87,7 @@ func _default_manifest() -> Dictionary:
 func _write_fresh_manifest_file() -> void:
 	var f: FileAccess = FileAccess.open(_manifest_path, FileAccess.WRITE)
 	if f == null:
-		push_error("[LabImporterTest] impossible d'écrire manifeste.json")
+		push_error("[LabImporterTest] Cannot write manifeste.json.")
 		return
 	f.store_string(JSON.stringify(_default_manifest(), "\t"))
 
@@ -102,7 +102,7 @@ func _patch_manifest_for_importer_v2() -> void:
 		return
 	var json: JSON = JSON.new()
 	if json.parse(t) != OK:
-		push_warning("[LabImporterTest] manifeste corrompu, recréation du gabarit v2")
+		push_warning("[LabImporterTest] Corrupt manifest, recreating template v2.")
 		_write_fresh_manifest_file()
 		return
 	var d: Variant = json.data

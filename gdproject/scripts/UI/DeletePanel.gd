@@ -35,7 +35,7 @@ func setup(kind: FileKind, json_path: String, target: Node) -> void:
 
 func _update_label_text() -> void:
 	var label := "this map" if _file_kind == FileKind.Map else "this tile pack"
-	_delete_text.text = "Confirm deletion of %s?\n\n%s" % [label, _json_path]
+	_delete_text.text = "Confirm deletion of %s?\n%s" % [label, _json_path]
 
 
 func _on_no_pressed() -> void:

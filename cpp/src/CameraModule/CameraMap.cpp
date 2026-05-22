@@ -67,7 +67,7 @@ namespace CameraModule {
         }
 
         Ref<InputEventMouseMotion> mouse_motion = p_event;
-        if (!mouse_motion.is_valid()) return; // Camera mouvement only run with mouse mouvement
+        if (!mouse_motion.is_valid()) return;
         Vector2 mouseDelta = mouse_motion->get_relative();
         switch (m_cameraMode) {
             case E_CameraMapMovementType::CAMERA_MAP_CLASSIC_MODE: {

@@ -8,7 +8,7 @@
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nkr70"]
 content_margin_left = 5.0
-bg_color = Color(0.6, 0.6, 0.6, 0)
+bg_color = Color(0.6, 0.6, 0.6, 0.117647)
 border_width_left = 4
 border_width_top = 4
 border_width_right = 4

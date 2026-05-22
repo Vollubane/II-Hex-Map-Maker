@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3 uid="uid://c8r1doioaovjs"]
+[gd_scene load_steps=22 format=3 uid="uid://c8r1doioaovjs"]
 
 [ext_resource type="Theme" uid="uid://bn75xffs0b7v8" path="res://Ressource/PanelTheme/ClassiqueTheme.tres" id="1_6sahm"]
 [ext_resource type="Script" uid="uid://kmshj4btr260" path="res://scripts/UI/AssetPackDisplayer.gd" id="1_script"]
@@ -64,6 +64,9 @@ spacing_bottom = -1
 content_margin_left = 0.0
 content_margin_top = 1.0
 bg_color = Color(0.6, 0.6, 0.6, 0)
+
+[sub_resource type="FontVariation" id="FontVariation_5rrox"]
+spacing_space = -1
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_info"]
 content_margin_left = 3.0
@@ -240,13 +243,14 @@ theme_override_styles/focus = SubResource("StyleBoxFlat_title")
 theme_override_styles/normal = SubResource("StyleBoxFlat_title")
 
 [node name="InfoLabel" type="Label" parent="MainButton/HBoxContainer/VBoxLabels"]
-custom_minimum_size = Vector2(1, 1)
+custom_minimum_size = Vector2(1, 15)
 layout_mode = 2
 size_flags_vertical = 0
-theme_override_font_sizes/font_size = 11
+theme_override_fonts/font = SubResource("FontVariation_5rrox")
+theme_override_font_sizes/font_size = 10
 theme_override_styles/normal = SubResource("StyleBoxFlat_info")
 text = "V0.0.0.1 | 2.6Go | 10/01/2026 | 25604 asset"
-autowrap_mode = 2
+clip_text = true
 
 [node name="VBoxLabels2" type="VBoxContainer" parent="MainButton/HBoxContainer"]
 custom_minimum_size = Vector2(42, 59)

@@ -111,6 +111,14 @@ namespace ImportExportModule {
                 return E_ImporterPictureMakerState::Calibrated;
             }
             case E_ImporterPictureMakerState::Calibrated: {
+                m_state = E_ImporterPictureMakerState::WaitAfterCalibrate;
+                return E_ImporterPictureMakerState::WaitAfterCalibrate;
+            }
+            case E_ImporterPictureMakerState::WaitAfterCalibrate: {
+                m_state = E_ImporterPictureMakerState::WaitAfterCalibrate2;
+                return E_ImporterPictureMakerState::WaitAfterCalibrate2;
+            }
+            case E_ImporterPictureMakerState::WaitAfterCalibrate2: {
                 screenShotObject();
                 m_state = E_ImporterPictureMakerState::Pictured;
                 return E_ImporterPictureMakerState::Pictured;
@@ -161,7 +169,14 @@ namespace ImportExportModule {
         }
         m_object3D = Object::cast_to<Node3D>(m_object);
         if (m_object3D == nullptr) {
-            UtilityFunctions::push_error("ImporterPictureMaker: instantiated root is not Node3D");
+            const TypedArray<Node> ch = m_object->get_children();
+            for (int ci = 0; ci < ch.size() && m_object3D == nullptr; ++ci) {
+                m_object3D = Object::cast_to<Node3D>(ch[ci]);
+            }
+        }
+        if (m_object3D == nullptr) {
+            UtilityFunctions::push_error(
+                String("ImporterPictureMaker: no Node3D found in scene root for: ") + m_objectPath);
             m_object->queue_free();
             m_object = nullptr;
             m_objectPath = String();

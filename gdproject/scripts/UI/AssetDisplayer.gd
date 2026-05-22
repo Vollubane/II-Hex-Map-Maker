@@ -1,28 +1,23 @@
-class_name AssetPackDisplayer
+class_name AssetDisplayer
 extends PanelContainer
 
-## Emitted when the main toggle changes state (`toggle_mode`).
-signal toggled(pressed: bool)
-## Emitted after a primary-area left double-click (strong open/action).
-signal double_clicked
-signal delete_pressed
+## Emitted when the toggle enters the pressed state (selected).
+signal selected
+## Emitted when the toggle returns to unpressed state (deselected).
+signal deselected
+## Fired after a rename is committed (Enter), or aborted via click-out cancel flow.
 signal title_submitted(new_title: String)
 
 @onready var _main_button: Button = $MainButton
-@onready var _title_label: Label = $MainButton/HBoxContainer/VBoxLabels/TitleSlot/TitleLabel
-@onready var _title_line_edit: LineEdit = $MainButton/HBoxContainer/VBoxLabels/TitleSlot/TitleLineEdit
-@onready var _info_label: Label = $MainButton/HBoxContainer/VBoxLabels/InfoLabel
-@onready var _delete_button: Button = $MainButton/HBoxContainer/VBoxLabels2/DeleteButton
-@onready var _rename_button: Button = $MainButton/HBoxContainer/VBoxLabels2/RenameButton
-
-## If false the delete Button is hidden and [signal delete_pressed] is never emitted.
-@export var connect_delete_pressed: bool = true
-
-## Resolved at runtime when `MainButton/HBoxContainer/PreviewTexture` is missing from some scenes.
-var _preview: TextureRect
+@onready var _texture_rect: TextureRect = $MainButton/VBoxContainer/Panel/TextureRect
+@onready var _title_label: Label = $MainButton/VBoxContainer/HBoxContainer/VBoxLabels/TitleSlot/TitleLabel
+@onready var _title_line_edit: LineEdit = $MainButton/VBoxContainer/HBoxContainer/VBoxLabels/TitleSlot/TitleLineEdit
+@onready var _rename_button: Button = $MainButton/VBoxContainer/HBoxContainer/RenameButton
 
 var _saved_title: String = ""
 var _suppress_focus_exit: bool = false
+## True only between rename open and submit/cancel; avoids stray focus_exit clearing the label on main toggle click.
+var _rename_session_active: bool = false
 
 const _FORBIDDEN_FILENAME_CHARS: Array[String] = ["/", "\\", "\"", ":", "*", "?", "<", ">", "|"]
 
@@ -35,20 +30,18 @@ func _title_contains_forbidden_filename_chars(s: String) -> bool:
 
 
 func _ready() -> void:
-	_preview = get_node_or_null("MainButton/HBoxContainer/PreviewTexture") as TextureRect
+	_title_label.visible = true
+	_title_line_edit.visible = false
+	_rename_session_active = false
+	set_process_input(false)
 	_main_button.toggled.connect(_on_main_button_toggled)
-	_main_button.gui_input.connect(_on_main_button_gui_input)
-	if connect_delete_pressed:
-		_delete_button.pressed.connect(_on_delete_pressed)
-	else:
-		_delete_button.visible = false
 	_rename_button.pressed.connect(_begin_title_edit)
 	_title_line_edit.text_submitted.connect(_on_title_line_edit_submitted)
 	_title_line_edit.focus_exited.connect(_on_title_line_edit_focus_exited)
 
 
 func _input(event: InputEvent) -> void:
-	if not _title_line_edit.visible:
+	if not _rename_session_active or not _title_line_edit.visible:
 		return
 	var global_pt: Vector2
 	if event is InputEventMouseButton:
@@ -70,18 +63,16 @@ func _input(event: InputEvent) -> void:
 
 
 func _on_main_button_toggled(button_pressed: bool) -> void:
-	toggled.emit(button_pressed)
+	if button_pressed:
+		selected.emit()
+	else:
+		deselected.emit()
 
 
-func _on_main_button_gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton:
-		var mb := event as InputEventMouseButton
-		if (
-			mb.button_index == MOUSE_BUTTON_LEFT
-			and mb.pressed
-			and mb.double_click
-		):
-			double_clicked.emit()
+## Updates preview texture and label / LineEdit backing text without touching toggle state (`null` texture clears preview).
+func set_preview_and_title(tex: Texture2D, title: String) -> void:
+	_texture_rect.texture = tex
+	set_title(title)
 
 
 func set_title(text: String) -> void:
@@ -89,25 +80,10 @@ func set_title(text: String) -> void:
 	_title_line_edit.text = text
 
 
-func set_info(text: String) -> void:
-	_info_label.text = text
-
-
-func set_title_and_info(title: String, info: String) -> void:
-	set_title(title)
-	set_info(info)
-
-
-func set_preview_texture(tex: Texture2D) -> void:
-	if _preview:
-		_preview.texture = tex
-
-
 func set_button_pressed(on: bool) -> void:
 	_main_button.set_pressed_no_signal(on)
 
 
-## Forces toggle off programmatically (`set_pressed_no_signal`); parent uses this for exclusivity lists.
 func unpress_button() -> void:
 	if not _main_button.button_pressed:
 		return
@@ -119,6 +95,7 @@ func is_button_pressed() -> bool:
 
 
 func _begin_title_edit() -> void:
+	_rename_session_active = true
 	_saved_title = _title_label.text
 	_title_line_edit.text = _saved_title
 	_title_label.visible = false
@@ -129,10 +106,16 @@ func _begin_title_edit() -> void:
 
 
 func _cancel_title_edit() -> void:
-	if not _title_line_edit.visible:
+	if not _rename_session_active:
 		return
-	_title_line_edit.text = _saved_title
-	_title_label.text = _saved_title
+	_rename_session_active = false
+	var restore := _saved_title
+	if restore.is_empty():
+		restore = _title_label.text
+	if restore.is_empty():
+		restore = _title_line_edit.text
+	_title_line_edit.text = restore
+	_title_label.text = restore
 	_title_line_edit.visible = false
 	_title_label.visible = true
 	set_process_input(false)
@@ -145,6 +128,7 @@ func _on_title_line_edit_submitted(new_text: String) -> void:
 		call_deferred("_clear_suppress_focus_deferred")
 		return
 	_suppress_focus_exit = true
+	_rename_session_active = false
 	_title_label.text = new_text
 	_title_line_edit.text = new_text
 	_title_line_edit.visible = false
@@ -161,10 +145,8 @@ func _clear_suppress_focus_deferred() -> void:
 func _on_title_line_edit_focus_exited() -> void:
 	if _suppress_focus_exit:
 		return
+	if not _rename_session_active:
+		return
 	if not _title_line_edit.visible:
 		return
 	_cancel_title_edit()
-
-
-func _on_delete_pressed() -> void:
-	delete_pressed.emit()
