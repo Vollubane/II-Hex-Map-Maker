@@ -94,6 +94,21 @@ func is_button_pressed() -> bool:
 	return _main_button.button_pressed
 
 
+## Overrides the normal-state border color to reflect the group this asset belongs to.
+func set_group_color(p_color: Color) -> void:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.188235, 0.215686, 0.262745, 1)
+	style.set_border_width_all(4)
+	style.border_color = p_color
+	style.set_corner_radius_all(12)
+	_main_button.add_theme_stylebox_override("normal", style)
+
+
+## Removes the group color override and restores the default border.
+func clear_group_color() -> void:
+	_main_button.remove_theme_stylebox_override("normal")
+
+
 func _begin_title_edit() -> void:
 	_rename_session_active = true
 	_saved_title = _title_label.text
@@ -123,6 +138,7 @@ func _cancel_title_edit() -> void:
 
 func _on_title_line_edit_submitted(new_text: String) -> void:
 	if _title_contains_forbidden_filename_chars(new_text):
+		SystemEventBus.warning_event.emit("Illegal characters in name.", 3.5)
 		_suppress_focus_exit = true
 		_cancel_title_edit()
 		call_deferred("_clear_suppress_focus_deferred")

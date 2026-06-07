@@ -1,10 +1,11 @@
-[gd_scene load_steps=49 format=3 uid="uid://cax0rkedrw44n"]
+[gd_scene load_steps=51 format=3 uid="uid://cax0rkedrw44n"]
 
 [ext_resource type="Theme" uid="uid://bn75xffs0b7v8" path="res://Ressource/PanelTheme/ClassiqueTheme.tres" id="1_uthlj"]
 [ext_resource type="Theme" uid="uid://d1bbw4jc26hyy" path="res://Ressource/PanelTheme/Title&FlatButtonTheme.tres" id="2_cqdwi"]
 [ext_resource type="Texture2D" uid="uid://cynjod04aochf" path="res://Ressource/UI Logo/EditButton.png" id="3_cqdwi"]
 [ext_resource type="Script" uid="uid://w7430cwm6ml1" path="res://scripts/UI/ListOfAssetPackPanel.gd" id="4_lst"]
 [ext_resource type="Script" uid="uid://cypqy3qcs6xiq" path="res://scripts/UI/AssetPackEditorPanel.gd" id="5_ape"]
+[ext_resource type="Script" uid="uid://dvniovtl5l7d6" path="res://scripts/UI/AssetManager.gd" id="6_am"]
 
 [sub_resource type="FontVariation" id="FontVariation_yncc2"]
 spacing_top = -8
@@ -404,6 +405,15 @@ border_color = Color(0.113725, 0.133333, 0.160784, 1)
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qgwcs"]
+bg_color = Color(0.208, 0.249067, 0.32, 1)
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.113725, 0.133333, 0.160784, 1)
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+
 [node name="AssetManager" type="Control"]
 layout_mode = 3
 anchors_preset = 15
@@ -412,6 +422,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("1_uthlj")
+script = ExtResource("6_am")
 
 [node name="ListOfAssetPackPanel" type="Panel" parent="."]
 clip_contents = true
@@ -535,7 +546,6 @@ text = "Open asset pack editor"
 
 [node name="AssetPackEditorPanel" type="Panel" parent="."]
 visible = false
-clip_contents = true
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -867,7 +877,7 @@ theme_override_styles/normal = SubResource("StyleBoxFlat_t8jrp")
 text = "Delete 
 selected assets"
 
-[node name="ManageGroupButton" type="Button" parent="AssetPackEditorPanel/VBoxContainer/AssetUtilitaryButtons/HBoxContainer"]
+[node name="ShowGroupListButton" type="Button" parent="AssetPackEditorPanel/VBoxContainer/AssetUtilitaryButtons/HBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 focus_mode = 0
@@ -881,10 +891,10 @@ theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_4ogdg")
 theme_override_styles/hover = SubResource("StyleBoxFlat_hq7wh")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_doprq")
 theme_override_styles/normal = SubResource("StyleBoxFlat_o8e1v")
-text = "Manage 
-Group"
+text = "Show Group
+List"
 
-[node name="ManageGroupButton2" type="Button" parent="AssetPackEditorPanel/VBoxContainer/AssetUtilitaryButtons/HBoxContainer"]
+[node name="RepairPackButton" type="Button" parent="AssetPackEditorPanel/VBoxContainer/AssetUtilitaryButtons/HBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 focus_mode = 0
@@ -929,3 +939,32 @@ size_flags_horizontal = 3
 theme_override_constants/h_separation = 0
 theme_override_constants/v_separation = 0
 columns = 5
+
+[node name="AssetPackEditorGroupsPanel" type="Panel" parent="AssetPackEditorPanel"]
+visible = false
+clip_contents = true
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_top = 0.05
+anchor_right = 1.42
+anchor_bottom = 0.98
+offset_right = -0.200073
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_qgwcs")
+
+[node name="ScrollContainer" type="ScrollContainer" parent="AssetPackEditorPanel/AssetPackEditorGroupsPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 5.0
+offset_right = -4.79993
+offset_bottom = -4.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="AssetPackEditorPanel/AssetPackEditorGroupsPanel/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3

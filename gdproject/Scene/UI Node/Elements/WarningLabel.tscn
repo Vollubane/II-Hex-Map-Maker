@@ -1,0 +1,51 @@
+[gd_scene load_steps=3 format=3 uid="uid://dyslm75qwfm5x"]
+
+[ext_resource type="Script" uid="uid://bt1e3mdllo64" path="res://scripts/UI/WarningLabel.gd" id="1_WarningLabel"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nmfsy"]
+content_margin_left = 16.0
+content_margin_top = 10.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+bg_color = Color(0.25, 0.239583, 0.2375, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.1, 0.0958333, 0.095, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0)
+
+[node name="WarningLabel" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_WarningLabel")
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.15
+anchor_top = 0.1
+anchor_right = 0.85
+anchor_bottom = 0.32
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="CenterContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.13, 0.13, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.254902)
+theme_override_font_sizes/font_size = 40
+theme_override_styles/normal = SubResource("StyleBoxFlat_nmfsy")
+text = "5"
+horizontal_alignment = 1
+vertical_alignment = 1

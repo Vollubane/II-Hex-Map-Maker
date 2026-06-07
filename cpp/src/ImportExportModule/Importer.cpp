@@ -13,16 +13,22 @@ namespace ImportExportModule {
         ClassDB::bind_method(D_METHOD("setupImportNewAssets", "asset_pack_path", "import_assets_path"), &Importer::setupImportNewAssets);
         ClassDB::bind_method(D_METHOD("setupRemoveAssetsFromPack", "asset_pack_path", "pack_gltf_file_names"), &Importer::setupRemoveAssetsFromPack);
         ClassDB::bind_method(D_METHOD("setupRepareAssetsPack", "asset_pack_path"), &Importer::setupRepareAssetsPack);
+        ClassDB::bind_method(D_METHOD("recomputeAndWriteManifest", "pack_root"), &Importer::recomputeAndWriteManifest);
     }
+
 
     Importer::Importer() :
         m_importerState{E_ImporterState::Waiting},
+        m_systemEventBus{nullptr},
         m_timeBudget(0.0)
     {}
 
     Importer::~Importer() {}
 
     void Importer::_ready() {
+        m_systemEventBus = get_node_or_null(NodePath("/root/SystemEventBus"));
+        if(m_systemEventBus == nullptr)
+            UtilityFunctions::push_error("Importer: ready, /root/SystemEventBus node not found");
         m_importerPictureMakerScene = ResourceLoader::get_singleton()->load(String(M_ModulesList.at("IMPORTER_PICTURE_MAKER").c_str()));
         if(m_importerPictureMakerScene.is_null()) {
             UtilityFunctions::push_error("Importer: ready, invalid ImporterPictureMaker scene resource");
@@ -94,6 +100,8 @@ namespace ImportExportModule {
         if(!buildImportPlan(found))
             return failSetup("Importer: setup, plan failed (IO or disk space)");
         m_importerState = E_ImporterState::Copying;
+        _emitLoading("Importing", "Copying glTF files",
+            String::num_int64(m_copy.plannedGltf.size()) + String(" glTF(s) queued"));
         return true;
     }
 
@@ -111,6 +119,7 @@ namespace ImportExportModule {
         m_picturing.returnPhase  = E_RepairSubPhase::FinalizeRepairWrite;
         m_repair.subPhase        = E_RepairSubPhase::BuildOrphanGltfList;
         m_importerState          = E_ImporterState::RepairingPack;
+        _emitLoading("Repairing Pack", "Scanning orphan files", "");
         return true;
     }
 
@@ -155,14 +164,16 @@ namespace ImportExportModule {
                 + String::num_int64(p_packGltfFileNames.size()) + String(" candidate(s))"));
         m_remove.subPhase = E_RemoveSubPhase::ListedAssetsAndDrainDeletions;
         m_importerState   = E_ImporterState::RemovingAssets;
+        _emitLoading("Removing Assets", "Removing asset files",
+            String::num_int64(m_remove.gltfKeys.size()) + String(" asset(s) to remove"));
         return true;
     }
 
     const bool Importer::failSetup(const String& p_msg) {
         UtilityFunctions::push_error(p_msg);
-        m_importerState = E_ImporterState::Destruct;
+            m_importerState = E_ImporterState::Destruct;
         queue_free();
-        return false;
+            return false;
     }
 
 }

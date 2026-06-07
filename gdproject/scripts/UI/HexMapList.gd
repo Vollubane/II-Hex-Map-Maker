@@ -41,23 +41,11 @@ func _app_version() -> String:
 
 
 func _read_map_dict(path: String) -> Dictionary:
-	if not FileAccess.file_exists(path):
-		return {}
-	var f := FileAccess.open(path, FileAccess.READ)
-	if f == null:
-		return {}
-	var txt := f.get_as_text()
-	var parsed = JSON.parse_string(txt)
-	return parsed if parsed is Dictionary else {}
+	return ManifestUtils.read_dict(path)
 
 
 func _write_json(path: String, data: Dictionary) -> Error:
-	var json_text := JSON.stringify(data, "\t")
-	var f := FileAccess.open(path, FileAccess.WRITE)
-	if f == null:
-		return FAILED
-	f.store_string(json_text)
-	return OK
+	return ManifestUtils.write_dict(path, data)
 
 
 func _minimal_map_dict() -> Dictionary:
@@ -136,10 +124,7 @@ func _add_row(path: String) -> void:
 
 
 func _sanitize_filename_stem(s: String) -> String:
-	var t := s.strip_edges()
-	if t.to_lower().ends_with(".json"):
-		t = t.substr(0, t.length() - 5)
-	return t.strip_edges()
+	return ManifestUtils.sanitize_stem(s)
 
 
 func _on_row_title_submitted(new_title: String, displayer: DataDisplayer) -> void:
@@ -153,6 +138,7 @@ func _on_row_title_submitted(new_title: String, displayer: DataDisplayer) -> voi
 		return
 	if FileAccess.file_exists(new_path):
 		push_warning("HexMapList: name already used")
+		SystemEventBus.warning_event.emit("Map name already in use.", 3.5)
 		displayer.set_title(_stem_from_path(old_path))
 		return
 	var da := DirAccess.open(MAPS_DIR)
@@ -162,6 +148,7 @@ func _on_row_title_submitted(new_title: String, displayer: DataDisplayer) -> voi
 	var err := da.rename(old_path.get_file(), new_path.get_file())
 	if err != OK:
 		push_error("HexMapList: rename failed %s" % err)
+		SystemEventBus.warning_event.emit("Map rename failed.", 4.0)
 		displayer.set_title(_stem_from_path(old_path))
 		return
 	displayer.set_meta("map_json_path", new_path)
@@ -212,13 +199,19 @@ func _on_row_delete_pressed(displayer: DataDisplayer) -> void:
 	dp.layout_mode = 1
 	dp.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	dp.move_to_front()
-	dp.setup(DeletePanel.FileKind.Map, path, displayer)
+	dp.setup(DeletePanel.FileKind.Map, path)
 	dp.delete_finished.connect(_on_delete_panel_finished)
 
 
-func _on_delete_panel_finished(_path: String, was_deleted: bool) -> void:
-	if was_deleted:
-		_refresh_map_list()
+func _on_delete_panel_finished(path: String, was_deleted: bool) -> void:
+	if not was_deleted:
+		return
+	if not path.is_empty():
+		var global_path := ProjectSettings.globalize_path(path)
+		var err := DirAccess.remove_absolute(global_path)
+		if err != OK:
+			push_error("HexMapList: failed to delete file (%s): %s" % [err, path])
+	_refresh_map_list()
 
 
 func _on_row_play_pressed(displayer: DataDisplayer) -> void:

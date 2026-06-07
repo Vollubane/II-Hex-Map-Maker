@@ -140,6 +140,7 @@ func _cancel_title_edit() -> void:
 
 func _on_title_line_edit_submitted(new_text: String) -> void:
 	if _title_contains_forbidden_filename_chars(new_text):
+		SystemEventBus.warning_event.emit("Illegal characters in name.", 3.5)
 		_suppress_focus_exit = true
 		_cancel_title_edit()
 		call_deferred("_clear_suppress_focus_deferred")

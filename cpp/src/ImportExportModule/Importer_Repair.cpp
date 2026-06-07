@@ -11,66 +11,88 @@ using namespace godot;
 namespace ImportExportModule {
 
     void Importer::runPicturingPhase() {
+        _emitLoading("Generating Thumbnails", "Rendering thumbnails",
+            String::num_int64(m_picturing.toCapture.size()) + String(" to capture (")
+            + String::num_int64(m_picturing.active.size()) + String(" active)"));
         if(m_importerPictureMakerScene.is_null()) return;
         while(m_picturing.idle.size() + m_picturing.active.size() < PICTURE_MAKER_MAX && 0.0 < m_timeBudget) {
             const uint64_t t0 = Time::get_singleton()->get_ticks_usec();
-            Node* n = m_importerPictureMakerScene->instantiate();
-            if(!n) { UtilityFunctions::push_error("Importer: picturing, instantiate ImporterPictureMaker failed"); break; }
-            ImporterPictureMaker* ipm = Object::cast_to<ImporterPictureMaker>(n);
-            if(!ipm) {
-                UtilityFunctions::push_error(String("Importer: picturing, scene root is not ImporterPictureMaker: ") + n->get_class());
-                n->queue_free(); debitTimeBudgetFromTicks(t0); break;
+            Node* newPictureMakerNode = m_importerPictureMakerScene->instantiate();
+            if(!newPictureMakerNode) { UtilityFunctions::push_error("Importer: picturing, instantiate ImporterPictureMaker failed"); break; }
+            ImporterPictureMaker* newPictureMaker = Object::cast_to<ImporterPictureMaker>(newPictureMakerNode);
+            if(!newPictureMaker) {
+                UtilityFunctions::push_error(String("Importer: picturing, scene root is not ImporterPictureMaker: ") + newPictureMakerNode->get_class());
+                newPictureMakerNode->queue_free(); debitTimeBudgetFromTicks(t0); break;
             }
-            add_child(ipm);
-            m_picturing.idle.append(ipm);
+            add_child(newPictureMaker);
+            m_picturing.idle.append(newPictureMaker);
             debitTimeBudgetFromTicks(t0);
         }
         for(int i = m_picturing.active.size() - 1; 0 <= i && 0.0 < m_timeBudget; --i) {
-            Object* o = m_picturing.active[i].operator Object*();
-            if(!o) {
+            Object* activeObject = m_picturing.active[i].operator Object*();
+            if(!activeObject) {
                 UtilityFunctions::push_error(String("Importer: picturing, null in active at index ") + String::num_int64(i));
                 m_picturing.active.remove_at(i); continue;
             }
-            ImporterPictureMaker* w = Object::cast_to<ImporterPictureMaker>(o);
-            if(!w) {
+            ImporterPictureMaker* activePictureMaker = Object::cast_to<ImporterPictureMaker>(activeObject);
+            if(!activePictureMaker) {
                 UtilityFunctions::push_error(String("Importer: picturing, active[") + String::num_int64(i)
-                    + String("] is not ImporterPictureMaker: ") + o->get_class());
-                if(Node* bad = Object::cast_to<Node>(o)) bad->queue_free();
+                    + String("] is not ImporterPictureMaker: ") + activeObject->get_class());
+                if(Node* invalidActiveNode = Object::cast_to<Node>(activeObject)) invalidActiveNode->queue_free();
                 m_picturing.active.remove_at(i); continue;
             }
             const uint64_t t0 = Time::get_singleton()->get_ticks_usec();
-            const ImporterPictureMaker::E_ImporterPictureMakerState s = w->stepProgress();
+            const ImporterPictureMaker::E_ImporterPictureMakerState picturingState = activePictureMaker->stepProgress();
             debitTimeBudgetFromTicks(t0);
-            if(s == ImporterPictureMaker::E_ImporterPictureMakerState::Waiting) {
+            if(picturingState == ImporterPictureMaker::E_ImporterPictureMakerState::Waiting) {
                 m_picturing.active.remove_at(i);
-                m_picturing.idle.append(w);
+                m_picturing.idle.append(activePictureMaker);
             }
         }
         while(0.0 < m_timeBudget && 0 < m_picturing.toCapture.size() && 0 < m_picturing.idle.size()) {
-            const uint64_t t0  = Time::get_singleton()->get_ticks_usec();
-            const int lasti    = m_picturing.idle.size() - 1;
-            Object* o = m_picturing.idle[lasti].operator Object*();
-            if(!o) {
-                UtilityFunctions::push_error(String("Importer: picturing, null in idle at index ") + String::num_int64(lasti));
-                m_picturing.idle.remove_at(lasti); debitTimeBudgetFromTicks(t0); continue;
+            const uint64_t t0       = Time::get_singleton()->get_ticks_usec();
+            const int lastIdleIndex = m_picturing.idle.size() - 1;
+            Object* idleObject = m_picturing.idle[lastIdleIndex].operator Object*();
+            if(!idleObject) {
+                UtilityFunctions::push_error(String("Importer: picturing, null in idle at index ") + String::num_int64(lastIdleIndex));
+                m_picturing.idle.remove_at(lastIdleIndex); debitTimeBudgetFromTicks(t0); continue;
             }
-            ImporterPictureMaker* ipm = Object::cast_to<ImporterPictureMaker>(o);
-            if(!ipm) {
-                UtilityFunctions::push_error(String("Importer: picturing, idle[") + String::num_int64(lasti)
-                    + String("] is not ImporterPictureMaker: ") + o->get_class());
-                if(Node* bad = Object::cast_to<Node>(o)) bad->queue_free();
-                m_picturing.idle.remove_at(lasti); debitTimeBudgetFromTicks(t0); continue;
+            ImporterPictureMaker* idlePictureMaker = Object::cast_to<ImporterPictureMaker>(idleObject);
+            if(!idlePictureMaker) {
+                UtilityFunctions::push_error(String("Importer: picturing, idle[") + String::num_int64(lastIdleIndex)
+                    + String("] is not ImporterPictureMaker: ") + idleObject->get_class());
+                if(Node* invalidIdleNode = Object::cast_to<Node>(idleObject)) invalidIdleNode->queue_free();
+                m_picturing.idle.remove_at(lastIdleIndex); debitTimeBudgetFromTicks(t0); continue;
             }
-            m_picturing.idle.remove_at(lasti);
-            const String path = m_picturing.toCapture[0];
+            m_picturing.idle.remove_at(lastIdleIndex);
+            const String gltfAbsPath = m_picturing.toCapture[0];
             m_picturing.toCapture.remove_at(0);
-            ipm->makeAPicture(path);
-            m_picturing.active.append(ipm);
+            idlePictureMaker->makeAPicture(gltfAbsPath);
+            m_picturing.active.append(idlePictureMaker);
             debitTimeBudgetFromTicks(t0);
         }
     }
 
     void Importer::runRemovingAssetsSlice() {
+        switch(m_remove.subPhase) {
+            case E_RemoveSubPhase::ListedAssetsAndDrainDeletions:
+                if(!m_remove.deletions.queue.is_empty())
+                    _emitLoading("Removing Assets", "Deleting files",
+                        String::num_int64(m_remove.deletions.queue.size()) + String(" left"));
+                else
+                    _emitLoading("Removing Assets", "Removing asset files",
+                        String::num_int64(m_remove.gltfKeys.size()) + String(" asset(s) left"));
+                break;
+            case E_RemoveSubPhase::PruneSidecarsEnqueueDeletes:
+                _emitLoading("Removing Assets", "Pruning sidecars", ""); break;
+            case E_RemoveSubPhase::DrainAfterSidecarPrune:
+                _emitLoading("Removing Assets", "Deleting files",
+                    String::num_int64(m_remove.deletions.queue.size()) + String(" left"));
+                break;
+            case E_RemoveSubPhase::RecomputeAndWriteManifest:
+                _emitLoading("Removing Assets", "Writing manifest", ""); break;
+            default: break;
+        }
         while(0.0 < m_timeBudget && m_remove.subPhase != E_RemoveSubPhase::SubDone) {
             switch(m_remove.subPhase) {
                 case E_RemoveSubPhase::ListedAssetsAndDrainDeletions: {
@@ -79,16 +101,16 @@ namespace ImportExportModule {
                         break;
                     }
                     if(!m_remove.gltfKeys.is_empty()) {
-                        const uint64_t t0 = Time::get_singleton()->get_ticks_usec();
-                        const String key  = String(m_remove.gltfKeys[0]);
+                        const uint64_t t0         = Time::get_singleton()->get_ticks_usec();
+                        const String gltfPackName = String(m_remove.gltfKeys[0]);
                         m_remove.gltfKeys.remove_at(0);
-                        Dictionary assets = manifestAssetsDict();
-                        if(assets.has(Variant(key))) {
-                            assets.erase(Variant(key));
-                            m_assetsPackManifest[ASSETS_KEY] = assets;
+                        Dictionary assetsDict = manifestAssetsDict();
+                        if(assetsDict.has(Variant(gltfPackName))) {
+                            assetsDict.erase(Variant(gltfPackName));
+                            m_assetsPackManifest[ASSETS_KEY] = assetsDict;
                         }
-                        removeEnqueueDeletionRel(key);
-                        removeEnqueueDeletionRel(packRelativeCapturePngForGltfPackName(key));
+                        removeEnqueueDeletionRel(gltfPackName);
+                        removeEnqueueDeletionRel(packRelativeCapturePngForGltfPackName(gltfPackName));
                         debitTimeBudgetFromTicks(t0);
                         break;
                     }
@@ -125,38 +147,38 @@ namespace ImportExportModule {
 
     void Importer::pruneUnreferencedSidecarsAndEnqueue(S_DeletionQueue& p_dq) {
         Dictionary refCounts;
-        const Dictionary A = manifestAssetsDict();
-        const Array ak = A.keys();
-        for(int ai = 0; ai < ak.size(); ++ai) {
-            if(!A.has(ak[ai])) continue;
-            Dictionary bd, td;
-            extractBinTexMapsFromAssetRow(Dictionary(A[ak[ai]]), bd, td);
-            const Array bk = bd.keys();
-            for(int bi = 0; bi < bk.size(); ++bi) {
-                const String pk = String("b/") + String(bk[bi]);
-                refCounts[pk] = dictGetInt(refCounts, pk) + 1;
+        const Dictionary assetsDict = manifestAssetsDict();
+        const Array assetKeys = assetsDict.keys();
+        for(int ai = 0; ai < assetKeys.size(); ++ai) {
+            if(!assetsDict.has(assetKeys[ai])) continue;
+            Dictionary assetBinSidecars, assetTexSidecars;
+            extractBinTexMapsFromAssetRow(Dictionary(assetsDict[assetKeys[ai]]), assetBinSidecars, assetTexSidecars);
+            const Array binSidecarFilenames = assetBinSidecars.keys();
+            for(int bi = 0; bi < binSidecarFilenames.size(); ++bi) {
+                const String refCountKey = String("b/") + String(binSidecarFilenames[bi]);
+                refCounts[refCountKey] = dictGetInt(refCounts, refCountKey) + 1;
             }
-            const Array tk = td.keys();
-            for(int ti = 0; ti < tk.size(); ++ti) {
-                const String pk = String("t/") + String(tk[ti]);
-                refCounts[pk] = dictGetInt(refCounts, pk) + 1;
+            const Array texSidecarFilenames = assetTexSidecars.keys();
+            for(int ti = 0; ti < texSidecarFilenames.size(); ++ti) {
+                const String refCountKey = String("t/") + String(texSidecarFilenames[ti]);
+                refCounts[refCountKey] = dictGetInt(refCounts, refCountKey) + 1;
             }
         }
         for(int pass = 0; pass < 2; ++pass) {
-            const char* const tname = pass == 0 ? BIN_DATA_KEY : TEX_DATA_KEY;
-            if(!m_assetsPackManifest.has(tname)) continue;
-            Dictionary T = Dictionary(m_assetsPackManifest[tname]);
-            const Array keys = T.keys();
-            for(int i = 0; i < keys.size(); ++i) {
-                const String pk   = String(keys[i]);
-                if(!T.has(Variant(pk))) continue;
-                const String pref = (pass == 0 ? String("b/") : String("t/")) + pk;
-                if(dictGetInt(refCounts, pref) == 0LL) {
-                    T.erase(Variant(pk));
-                    enqueuePackRelativeDeletionRel(p_dq, pk);
+            const char* const sidecarTableName = pass == 0 ? BIN_DATA_KEY : TEX_DATA_KEY;
+            if(!m_assetsPackManifest.has(sidecarTableName)) continue;
+            Dictionary sidecarTable = Dictionary(m_assetsPackManifest[sidecarTableName]);
+            const Array sidecarFilenames = sidecarTable.keys();
+            for(int i = 0; i < sidecarFilenames.size(); ++i) {
+                const String sidecarFilename = String(sidecarFilenames[i]);
+                if(!sidecarTable.has(Variant(sidecarFilename))) continue;
+                const String refCountLookupKey = (pass == 0 ? String("b/") : String("t/")) + sidecarFilename;
+                if(dictGetInt(refCounts, refCountLookupKey) == 0LL) {
+                    sidecarTable.erase(Variant(sidecarFilename));
+                    enqueuePackRelativeDeletionRel(p_dq, sidecarFilename);
                 }
             }
-            m_assetsPackManifest[tname] = T;
+            m_assetsPackManifest[sidecarTableName] = sidecarTable;
         }
     }
 
@@ -165,28 +187,57 @@ namespace ImportExportModule {
     }
 
     void Importer::runRepairPackSlice() {
+        switch(m_repair.subPhase) {
+            case E_RepairSubPhase::BuildOrphanGltfList:
+                _emitLoading("Repairing Pack", "Scanning orphan files", ""); break;
+            case E_RepairSubPhase::ResolveOrphanGltfSlice:
+                _emitLoading("Repairing Pack", "Adopting orphan files",
+                    String::num_int64(m_repair.workQueue.size()) + String(" left"));
+                break;
+            case E_RepairSubPhase::PrepareDedupNonGltf:
+                _emitLoading("Repairing Pack", "Preparing deduplication", ""); break;
+            case E_RepairSubPhase::DedupCloneGroupsIterate:
+                _emitLoading("Repairing Pack",
+                    m_repair.dedupIsGltfWave ? String("Deduplicating glTF") : String("Deduplicating sidecars"),
+                    String("Bucket ") + String::num_int64(m_repair.dedupIdx + 1)
+                        + String(" / ") + String::num_int64(m_repair.sizeBuckets.size()));
+                break;
+            case E_RepairSubPhase::PrepareDedupGltfManifest:
+                _emitLoading("Repairing Pack", "Preparing glTF dedup", ""); break;
+            case E_RepairSubPhase::CollectDeletionCandidates:
+                _emitLoading("Repairing Pack", "Collecting duplicates", ""); break;
+            case E_RepairSubPhase::ExecuteDeletionQueue:
+                _emitLoading("Repairing Pack", "Deleting duplicates",
+                    String::num_int64(m_repair.deletions.queue.size()) + String(" file(s)"));
+                break;
+            case E_RepairSubPhase::BeginThumbnailGeneration:
+                _emitLoading("Repairing Pack", "Starting thumbnails", ""); break;
+            case E_RepairSubPhase::FinalizeRepairWrite:
+                _emitLoading("Repairing Pack", "Writing manifest", ""); break;
+            default: break;
+        }
         while(0.0 < m_timeBudget) {
             const uint64_t t0 = Time::get_singleton()->get_ticks_usec();
             bool elapsedCharged = false;
             switch(m_repair.subPhase) {
                 case E_RepairSubPhase::BuildOrphanGltfList: {
                     m_repair.workQueue.clear();
-                    Array diskGltf;
-                    listPackRootGltfFileNames(diskGltf);
-                    const Dictionary ad = manifestAssetsDict();
-                    for(int i = 0; i < diskGltf.size(); ++i) {
-                        const String nm = String(diskGltf[i]);
-                        if(nm.is_empty() || nm == "." || nm == "..") continue;
-                        if(!ad.has(Variant(nm))) m_repair.workQueue.append(nm);
+                    Array diskGltfFilenames;
+                    listPackRootGltfFileNames(diskGltfFilenames);
+                    const Dictionary assetsDict = manifestAssetsDict();
+                    for(int i = 0; i < diskGltfFilenames.size(); ++i) {
+                        const String diskGltfName = String(diskGltfFilenames[i]);
+                        if(diskGltfName.is_empty() || diskGltfName == "." || diskGltfName == "..") continue;
+                        if(!assetsDict.has(Variant(diskGltfName))) m_repair.workQueue.append(diskGltfName);
                     }
                     m_repair.subPhase = E_RepairSubPhase::ResolveOrphanGltfSlice;
                 } break;
 
                 case E_RepairSubPhase::ResolveOrphanGltfSlice: {
                     if(0.0 < m_timeBudget && !m_repair.workQueue.is_empty()) {
-                        const String one = String(m_repair.workQueue[0]);
+                        const String orphanGltfName = String(m_repair.workQueue[0]);
                         m_repair.workQueue.remove_at(0);
-                        repairTryAdoptOrphanGltf(one);
+                        repairTryAdoptOrphanGltf(orphanGltfName);
                     }
                     if(m_repair.workQueue.is_empty())
                         m_repair.subPhase = E_RepairSubPhase::CollectMissingThumbnailsList;
@@ -258,322 +309,322 @@ namespace ImportExportModule {
     }
 
     const bool Importer::repairTryAdoptOrphanGltf(const String& p_pack_gltf_name) {
-        const String fullGltf      = m_assetPackPath.path_join(p_pack_gltf_name);
-        const Dictionary maybeRoot = getDictionaryFromJsonPath(fullGltf);
-        if(maybeRoot.is_empty()) { repairEnqueueDeletionRel(p_pack_gltf_name); return true; }
-        Array ulist;
-        appendGltfBuffersAndImagesUriRows(maybeRoot, ulist);
-        Dictionary reserved;
-        collectReservedNamesFromPack(reserved);
-        Dictionary srcToPack;
+        const String gltfAbsPath        = m_assetPackPath.path_join(p_pack_gltf_name);
+        const Dictionary gltfJsonRoot   = getDictionaryFromJsonPath(gltfAbsPath);
+        if(gltfJsonRoot.is_empty()) { repairEnqueueDeletionRel(p_pack_gltf_name); return true; }
+        Array uriRows;
+        appendGltfBuffersAndImagesUriRows(gltfJsonRoot, uriRows);
+        Dictionary reservedFilenames;
+        collectReservedNamesFromPack(reservedFilenames);
+        Dictionary sourcePathToPackName;
         Array sidecarCopyPlans;
         bool anyMissing = false;
-        for(int u = 0; u < ulist.size(); ++u) {
-            const Dictionary um  = ulist[u];
-            const String uri     = String(um["uri"]);
-            const bool isBuf     = bool(um["is_buffer"]);
+        for(int u = 0; u < uriRows.size(); ++u) {
+            const Dictionary uriRow       = uriRows[u];
+            const String uri              = String(uriRow["uri"]);
+            const bool isBuffer           = bool(uriRow["is_buffer"]);
             if(gltfUriCannotMapToLocalFile(uri)) continue;
-            const String absFile = resolveGltfUriToAbsoluteFile(fullGltf, uri);
-            if(absFile.is_empty() || !FileAccess::file_exists(absFile)) { anyMissing = true; continue; }
-            const String simp = absFile.simplify_path();
-            if(srcToPack.has(simp)) continue;
-            const Ref<FileAccess> rf = FileAccess::open(absFile, FileAccess::ModeFlags::READ);
-            if(rf.is_null()) { anyMissing = true; continue; }
-            const uint64_t szBytes = rf->get_length();
-            const int64_t  isize   = int64_t(szBytes);
-            const char* const tbl  = isBuf ? BIN_DATA_KEY : TEX_DATA_KEY;
-            if(pathIsUnderPack(absFile)) {
-                const String pfn = absFile.get_file();
-                ensureManifestSidecarRow(tbl, pfn, pfn, isize);
-                srcToPack[simp] = pfn;
-                reserved[Variant(pfn)] = true;
+            const String absoluteFilePath = resolveGltfUriToAbsoluteFile(gltfAbsPath, uri);
+            if(absoluteFilePath.is_empty() || !FileAccess::file_exists(absoluteFilePath)) { anyMissing = true; continue; }
+            const String simplifiedFilePath = absoluteFilePath.simplify_path();
+            if(sourcePathToPackName.has(simplifiedFilePath)) continue;
+            const Ref<FileAccess> sidecarFile = FileAccess::open(absoluteFilePath, FileAccess::ModeFlags::READ);
+            if(sidecarFile.is_null()) { anyMissing = true; continue; }
+            const uint64_t fileSizeBytes  = sidecarFile->get_length();
+            const int64_t  fileSizeInt64  = int64_t(fileSizeBytes);
+            const char* const sidecarTableName = isBuffer ? BIN_DATA_KEY : TEX_DATA_KEY;
+            if(pathIsUnderPack(absoluteFilePath)) {
+                const String packFilename = absoluteFilePath.get_file();
+                ensureManifestSidecarRow(sidecarTableName, packFilename, packFilename, fileSizeInt64);
+                sourcePathToPackName[simplifiedFilePath] = packFilename;
+                reservedFilenames[Variant(packFilename)] = true;
                 continue;
             }
-            const String tRelGuess = absFile.get_file();
-            String reusePackName;
-            if(fileExistsInPackByTruePath(tRelGuess, szBytes, isBuf, reusePackName)) {
-                srcToPack[simp] = reusePackName;
+            const String importRelativePathGuess = absoluteFilePath.get_file();
+            String existingPackName;
+            if(fileExistsInPackByTruePath(importRelativePathGuess, fileSizeBytes, isBuffer, existingPackName)) {
+                sourcePathToPackName[simplifiedFilePath] = existingPackName;
                 continue;
             }
-            const String newPackFn = pickPackNameForNewSidecar(absFile, isBuf, szBytes, reserved);
-            Dictionary plan;
-            plan["source"]    = simp;
-            plan["pack_name"] = newPackFn;
-            plan["true_path"] = tRelGuess;
-            plan["is_bin"]    = isBuf;
-            plan["size"]      = isize;
-            sidecarCopyPlans.append(plan);
-            reserved[Variant(newPackFn)] = true;
-            srcToPack[simp] = newPackFn;
+            const String newPackFilename = pickPackNameForNewSidecar(absoluteFilePath, isBuffer, fileSizeBytes, reservedFilenames);
+            Dictionary sidecarCopyPlan;
+            sidecarCopyPlan["source"]    = simplifiedFilePath;
+            sidecarCopyPlan["pack_name"] = newPackFilename;
+            sidecarCopyPlan["true_path"] = importRelativePathGuess;
+            sidecarCopyPlan["is_bin"]    = isBuffer;
+            sidecarCopyPlan["size"]      = fileSizeInt64;
+            sidecarCopyPlans.append(sidecarCopyPlan);
+            reservedFilenames[Variant(newPackFilename)] = true;
+            sourcePathToPackName[simplifiedFilePath] = newPackFilename;
         }
         if(anyMissing) { repairEnqueueDeletionRel(p_pack_gltf_name); return true; }
-        for(int cpi = 0; cpi < sidecarCopyPlans.size(); ++cpi) {
-            const Dictionary dcp = sidecarCopyPlans[cpi];
+        for(int planIndex = 0; planIndex < sidecarCopyPlans.size(); ++planIndex) {
+            const Dictionary sidecarCopyPlan = sidecarCopyPlans[planIndex];
             if(!copySidecarToPackAndRecord(
-                    String(dcp["source"]), String(dcp["pack_name"]),
-                    String(dcp["true_path"]), bool(dcp["is_bin"]), int64_t(dcp["size"]))) {
+                    String(sidecarCopyPlan["source"]), String(sidecarCopyPlan["pack_name"]),
+                    String(sidecarCopyPlan["true_path"]), bool(sidecarCopyPlan["is_bin"]), int64_t(sidecarCopyPlan["size"]))) {
                 repairEnqueueDeletionRel(p_pack_gltf_name);
                 return true;
             }
         }
-        Dictionary uriMap, binD, texD;
-        for(int ii = 0; ii < ulist.size(); ++ii) {
-            const Dictionary wm  = ulist[ii];
-            const String ur      = String(wm["uri"]);
-            const String absR    = resolveGltfUriToAbsoluteFile(fullGltf, ur);
-            if(absR.is_empty()) continue;
-            const String simplified = absR.simplify_path();
-            if(!srcToPack.has(simplified)) continue;
-            const String newName = String(srcToPack[simplified]);
-            uriMap[ur] = newName;
-            if(bool(wm["is_buffer"])) binD[Variant(newName)] = absR.get_file();
-            else                      texD[Variant(newName)] = absR.get_file();
+        Dictionary uriToPackName, binSidecarEntries, texSidecarEntries;
+        for(int ui = 0; ui < uriRows.size(); ++ui) {
+            const Dictionary uriRow       = uriRows[ui];
+            const String uri              = String(uriRow["uri"]);
+            const String absoluteFilePath = resolveGltfUriToAbsoluteFile(gltfAbsPath, uri);
+            if(absoluteFilePath.is_empty()) continue;
+            const String simplifiedFilePath = absoluteFilePath.simplify_path();
+            if(!sourcePathToPackName.has(simplifiedFilePath)) continue;
+            const String assignedPackName = String(sourcePathToPackName[simplifiedFilePath]);
+            uriToPackName[uri] = assignedPackName;
+            if(bool(uriRow["is_buffer"])) binSidecarEntries[Variant(assignedPackName)] = absoluteFilePath.get_file();
+            else                          texSidecarEntries[Variant(assignedPackName)] = absoluteFilePath.get_file();
         }
-        String gltfTxt;
+        String gltfFileContent;
         {
-            const Ref<FileAccess> rgf = FileAccess::open(fullGltf, FileAccess::ModeFlags::READ);
-            if(rgf.is_null()) { repairEnqueueDeletionRel(p_pack_gltf_name); return true; }
-            gltfTxt = rgf->get_as_text();
+            const Ref<FileAccess> gltfReadFile = FileAccess::open(gltfAbsPath, FileAccess::ModeFlags::READ);
+            if(gltfReadFile.is_null()) { repairEnqueueDeletionRel(p_pack_gltf_name); return true; }
+            gltfFileContent = gltfReadFile->get_as_text();
         }
-        sortDedupAndApplyUriStrings(gltfTxt, uriMap);
+        sortDedupAndApplyUriStrings(gltfFileContent, uriToPackName);
         {
-            const Ref<FileAccess> wgf = FileAccess::open(fullGltf, FileAccess::ModeFlags::WRITE);
-            if(wgf.is_null()) { repairEnqueueDeletionRel(p_pack_gltf_name); return true; }
-            wgf->store_string(gltfTxt);
+            const Ref<FileAccess> gltfWriteFile = FileAccess::open(gltfAbsPath, FileAccess::ModeFlags::WRITE);
+            if(gltfWriteFile.is_null()) { repairEnqueueDeletionRel(p_pack_gltf_name); return true; }
+            gltfWriteFile->store_string(gltfFileContent);
         }
         {
-            const Ref<FileAccess> sizeRf = FileAccess::open(fullGltf, FileAccess::ModeFlags::READ);
-            const int64_t orphanSz = sizeRf.is_valid() ? int64_t(sizeRf->get_length()) : 0LL;
-            if(orphanSz > 0) {
-                const Dictionary A = manifestAssetsDict();
-                const Array ak     = A.keys();
-                for(int ek = 0; ek < ak.size(); ++ek) {
-                    const String exKey = String(ak[ek]);
-                    if(!exKey.to_lower().ends_with(".gltf") || exKey == p_pack_gltf_name) continue;
-                    const Dictionary exRow = Dictionary(A[exKey]);
-                    int64_t exW = exRow.has(WEIGHT_KEY) ? int64_t(exRow[WEIGHT_KEY]) : 0LL;
-                    if(exW == 0) {
-                        const Ref<FileAccess> exRf = FileAccess::open(m_assetPackPath.path_join(exKey), FileAccess::ModeFlags::READ);
-                        if(exRf.is_valid()) exW = int64_t(exRf->get_length());
+            const Ref<FileAccess> sizeCheckFile = FileAccess::open(gltfAbsPath, FileAccess::ModeFlags::READ);
+            const int64_t orphanFileSizeBytes = sizeCheckFile.is_valid() ? int64_t(sizeCheckFile->get_length()) : 0LL;
+            if(orphanFileSizeBytes > 0) {
+                const Dictionary assetsDict = manifestAssetsDict();
+                const Array assetKeys       = assetsDict.keys();
+                for(int ei = 0; ei < assetKeys.size(); ++ei) {
+                    const String existingAssetFilename = String(assetKeys[ei]);
+                    if(!existingAssetFilename.to_lower().ends_with(".gltf") || existingAssetFilename == p_pack_gltf_name) continue;
+                    const Dictionary existingAssetRow = Dictionary(assetsDict[existingAssetFilename]);
+                    int64_t existingAssetWeight = existingAssetRow.has(WEIGHT_KEY) ? int64_t(existingAssetRow[WEIGHT_KEY]) : 0LL;
+                    if(existingAssetWeight == 0) {
+                        const Ref<FileAccess> existingGltfFile = FileAccess::open(m_assetPackPath.path_join(existingAssetFilename), FileAccess::ModeFlags::READ);
+                        if(existingGltfFile.is_valid()) existingAssetWeight = int64_t(existingGltfFile->get_length());
                     }
-                    if(exW != orphanSz) continue;
-                    Dictionary exBd, exTd;
-                    extractBinTexMapsFromAssetRow(exRow, exBd, exTd);
-                    if(exBd.keys().hash() != Dictionary(binD).keys().hash()) continue;
-                    if(!fileBinaryEqual(fullGltf, m_assetPackPath.path_join(exKey))) continue;
+                    if(existingAssetWeight != orphanFileSizeBytes) continue;
+                    Dictionary existingBinSidecars, existingTexSidecars;
+                    extractBinTexMapsFromAssetRow(existingAssetRow, existingBinSidecars, existingTexSidecars);
+                    if(existingBinSidecars.keys().hash() != Dictionary(binSidecarEntries).keys().hash()) continue;
+                    if(!fileBinaryEqual(gltfAbsPath, m_assetPackPath.path_join(existingAssetFilename))) continue;
                     repairEnqueueDeletionRel(p_pack_gltf_name);
                     return true;
                 }
             }
         }
-        const Ref<FileAccess> glenRf = FileAccess::open(fullGltf, FileAccess::ModeFlags::READ);
-        Dictionary itemAdopt;
-        itemAdopt["pack_name"]  = p_pack_gltf_name;
-        itemAdopt["true_path"]  = p_pack_gltf_name;
-        itemAdopt["group"]      = String("");
-        itemAdopt["gltf_size"]  = glenRf.is_valid() ? int64_t(glenRf->get_length()) : 0LL;
-        itemAdopt[BIN_ROW_KEY]  = binD;
-        itemAdopt[TEX_ROW_KEY]  = texD;
-        recordGltfRowInManifest(itemAdopt);
+        const Ref<FileAccess> adoptedGltfFile = FileAccess::open(gltfAbsPath, FileAccess::ModeFlags::READ);
+        Dictionary adoptedAssetRow;
+        adoptedAssetRow["pack_name"]  = p_pack_gltf_name;
+        adoptedAssetRow["true_path"]  = p_pack_gltf_name;
+        adoptedAssetRow["group"]      = String("");
+        adoptedAssetRow["gltf_size"]  = adoptedGltfFile.is_valid() ? int64_t(adoptedGltfFile->get_length()) : 0LL;
+        adoptedAssetRow[BIN_ROW_KEY]  = binSidecarEntries;
+        adoptedAssetRow[TEX_ROW_KEY]  = texSidecarEntries;
+        recordGltfRowInManifest(adoptedAssetRow);
         return true;
     }
 
     void Importer::repairFillThumbnailQueueFromManifest() {
         m_repair.thumbnailQueue.clear();
-        const Dictionary A         = manifestAssetsDict();
-        const Array aks            = A.keys();
-        const String captureAbsDir = m_assetPackPath.path_join("capture");
-        for(int i = 0; i < aks.size(); ++i) {
-            const String gname = String(aks[i]);
-            if(!gname.to_lower().ends_with(".gltf") || !A.has(Variant(gname))) continue;
-            const String pngAbs = captureAbsDir.path_join(gname.get_basename() + String(".png"));
-            if(FileAccess::file_exists(pngAbs)) continue;
-            const String gpAbs = m_assetPackPath.path_join(gname);
-            if(FileAccess::file_exists(gpAbs)) m_repair.thumbnailQueue.append(gpAbs);
+        const Dictionary assetsDict    = manifestAssetsDict();
+        const Array assetKeys          = assetsDict.keys();
+        const String captureAbsDir     = m_assetPackPath.path_join("capture");
+        for(int i = 0; i < assetKeys.size(); ++i) {
+            const String assetFilename = String(assetKeys[i]);
+            if(!assetFilename.to_lower().ends_with(".gltf") || !assetsDict.has(Variant(assetFilename))) continue;
+            const String thumbnailAbsPath = captureAbsDir.path_join(assetFilename.get_basename() + String(".png"));
+            if(FileAccess::file_exists(thumbnailAbsPath)) continue;
+            const String gltfAbsPath = m_assetPackPath.path_join(assetFilename);
+            if(FileAccess::file_exists(gltfAbsPath)) m_repair.thumbnailQueue.append(gltfAbsPath);
         }
     }
 
     void Importer::repairBuildNonGltfExtensionSizeBuckets() {
         m_repair.sizeBuckets.clear();
-        Dictionary groupNames;
-        const auto add_fname = [&](const String& fname) {
-            if(fname.is_empty() || fname.to_lower().ends_with(".gltf")) return;
-            const String full = m_assetPackPath.path_join(fname);
-            if(!FileAccess::file_exists(full)) return;
-            const Ref<FileAccess> rf = FileAccess::open(full, FileAccess::ModeFlags::READ);
-            if(rf.is_null()) return;
-            const int64_t len = int64_t(rf->get_length());
-            if(len <= 0) return;
-            const String grp = fname.get_extension().to_lower() + String("|") + String::num_int64(len);
-            dictPushToArray(groupNames, grp, fname);
+        Dictionary filenamesByBucket;
+        const auto addSidecarFileToBucket = [&](const String& sidecarFilename) {
+            if(sidecarFilename.is_empty() || sidecarFilename.to_lower().ends_with(".gltf")) return;
+            const String absoluteFilePath = m_assetPackPath.path_join(sidecarFilename);
+            if(!FileAccess::file_exists(absoluteFilePath)) return;
+            const Ref<FileAccess> sidecarFile = FileAccess::open(absoluteFilePath, FileAccess::ModeFlags::READ);
+            if(sidecarFile.is_null()) return;
+            const int64_t fileSizeBytes = int64_t(sidecarFile->get_length());
+            if(fileSizeBytes <= 0) return;
+            const String bucketKey = sidecarFilename.get_extension().to_lower() + String("|") + String::num_int64(fileSizeBytes);
+            dictPushToArray(filenamesByBucket, bucketKey, sidecarFilename);
         };
-        const Array bk = manifestBinDict().keys();
-        for(int i = 0; i < bk.size(); ++i) add_fname(String(bk[i]));
-        const Array tk = manifestTexDict().keys();
-        for(int i = 0; i < tk.size(); ++i) add_fname(String(tk[i]));
-        const Array gkk = groupNames.keys();
-        for(int i = 0; i < gkk.size(); ++i) {
-            const Variant vgn = groupNames[gkk[i]];
-            Array names = vgn.get_type() == Variant::Type::ARRAY ? Array(vgn) : Array();
-            if(names.size() < 2) continue;
-            Dictionary bk2;
-            bk2["names"] = names;
-            bk2["_j"]    = 1;
-            m_repair.sizeBuckets.append(bk2);
+        const Array binFilenames = manifestBinDict().keys();
+        for(int i = 0; i < binFilenames.size(); ++i) addSidecarFileToBucket(String(binFilenames[i]));
+        const Array texFilenames = manifestTexDict().keys();
+        for(int i = 0; i < texFilenames.size(); ++i) addSidecarFileToBucket(String(texFilenames[i]));
+        const Array bucketKeys = filenamesByBucket.keys();
+        for(int i = 0; i < bucketKeys.size(); ++i) {
+            const Variant bucketNamesVariant = filenamesByBucket[bucketKeys[i]];
+            Array candidateFilenames = bucketNamesVariant.get_type() == Variant::Type::ARRAY ? Array(bucketNamesVariant) : Array();
+            if(candidateFilenames.size() < 2) continue;
+            Dictionary dedupBucket;
+            dedupBucket["names"]                  = candidateFilenames;
+            dedupBucket[DEDUP_COMPARE_INDEX_KEY] = 1;
+            m_repair.sizeBuckets.append(dedupBucket);
         }
     }
 
     void Importer::repairBuildManifestGltfWeightSideBuckets() {
         m_repair.sizeBuckets.clear();
         if(!m_assetsPackManifest.has(ASSETS_KEY)) return;
-        Dictionary A        = Dictionary(m_assetsPackManifest[ASSETS_KEY]);
-        const Array ak      = A.keys();
-        Dictionary groupKeys;
-        const auto keysFingerprint = [](const Dictionary& d) {
-            Array kk = d.keys(); kk.sort();
-            String acc;
-            for(int i = 0; i < kk.size(); ++i) acc += String(kk[i]) + String(";");
-            return acc;
+        Dictionary assetsDict   = Dictionary(m_assetsPackManifest[ASSETS_KEY]);
+        const Array assetKeys   = assetsDict.keys();
+        Dictionary assetsByFingerprintKey;
+        const auto computeSidecarKeysFingerprint = [](const Dictionary& sidecarDict) {
+            Array sortedSidecarKeys = sidecarDict.keys(); sortedSidecarKeys.sort();
+            String fingerprint;
+            for(int i = 0; i < sortedSidecarKeys.size(); ++i) fingerprint += String(sortedSidecarKeys[i]) + String(";");
+            return fingerprint;
         };
-        for(int i = 0; i < ak.size(); ++i) {
-            const String gnm = String(ak[i]);
-            if(!gnm.to_lower().ends_with(".gltf") || !A.has(Variant(gnm))) continue;
-            const Ref<FileAccess> szRf = FileAccess::open(m_assetPackPath.path_join(gnm), FileAccess::ModeFlags::READ);
-            if(szRf.is_null()) continue;
-            const int64_t w = int64_t(szRf->get_length());
-            if(w == 0) continue;
-            const Dictionary rd = Dictionary(A[gnm]);
-            Dictionary bd, td;
-            extractBinTexMapsFromAssetRow(rd, bd, td);
-            const String fk = String::num_int64(w) + String("::")
-                + keysFingerprint(bd) + String("::") + keysFingerprint(td);
-            dictPushToArray(groupKeys, fk, gnm);
+        for(int i = 0; i < assetKeys.size(); ++i) {
+            const String gltfFilename = String(assetKeys[i]);
+            if(!gltfFilename.to_lower().ends_with(".gltf") || !assetsDict.has(Variant(gltfFilename))) continue;
+            const Ref<FileAccess> gltfFile = FileAccess::open(m_assetPackPath.path_join(gltfFilename), FileAccess::ModeFlags::READ);
+            if(gltfFile.is_null()) continue;
+            const int64_t gltfFileSizeBytes = int64_t(gltfFile->get_length());
+            if(gltfFileSizeBytes == 0) continue;
+            const Dictionary assetRow = Dictionary(assetsDict[gltfFilename]);
+            Dictionary binSidecars, texSidecars;
+            extractBinTexMapsFromAssetRow(assetRow, binSidecars, texSidecars);
+            const String assetFingerprintKey = String::num_int64(gltfFileSizeBytes) + String("::")
+                + computeSidecarKeysFingerprint(binSidecars) + String("::") + computeSidecarKeysFingerprint(texSidecars);
+            dictPushToArray(assetsByFingerprintKey, assetFingerprintKey, gltfFilename);
         }
-        const Array gkz = groupKeys.keys();
-        for(int j = 0; j < gkz.size(); ++j) {
-            const Variant vw = groupKeys[gkz[j]];
-            Array nmz = vw.get_type() == Variant::Type::ARRAY ? Array(vw) : Array();
-            if(nmz.size() < 2) continue;
-            Array ordered, zeros;
-            for(int n = 0; n < nmz.size(); ++n) {
-                const String nm  = String(nmz[n]);
-                const Dictionary row = A.has(Variant(nm)) ? Dictionary(A[Variant(nm)]) : Dictionary();
-                if(row.has(WEIGHT_KEY) && int64_t(row[WEIGHT_KEY]) != 0LL)
-                    ordered.append(nm);
+        const Array fingerprintKeys = assetsByFingerprintKey.keys();
+        for(int j = 0; j < fingerprintKeys.size(); ++j) {
+            const Variant candidatesVariant = assetsByFingerprintKey[fingerprintKeys[j]];
+            Array candidateFilenames = candidatesVariant.get_type() == Variant::Type::ARRAY ? Array(candidatesVariant) : Array();
+            if(candidateFilenames.size() < 2) continue;
+            Array assetsWithWeight, assetsWithZeroWeight;
+            for(int n = 0; n < candidateFilenames.size(); ++n) {
+                const String gltfFilename = String(candidateFilenames[n]);
+                const Dictionary assetRow = assetsDict.has(Variant(gltfFilename)) ? Dictionary(assetsDict[Variant(gltfFilename)]) : Dictionary();
+                if(assetRow.has(WEIGHT_KEY) && int64_t(assetRow[WEIGHT_KEY]) != 0LL)
+                    assetsWithWeight.append(gltfFilename);
                 else
-                    zeros.append(nm);
+                    assetsWithZeroWeight.append(gltfFilename);
             }
-            for(int n = 0; n < zeros.size(); ++n) ordered.append(zeros[n]);
-            Dictionary bkq;
-            bkq["names"] = ordered;
-            bkq["_j"]    = 1;
-            m_repair.sizeBuckets.append(bkq);
+            for(int n = 0; n < assetsWithZeroWeight.size(); ++n) assetsWithWeight.append(assetsWithZeroWeight[n]);
+            Dictionary dedupBucket;
+            dedupBucket["names"]                  = assetsWithWeight;
+            dedupBucket[DEDUP_COMPARE_INDEX_KEY] = 1;
+            m_repair.sizeBuckets.append(dedupBucket);
         }
     }
 
     const bool Importer::repairDedupCloneGroupsOneStep() {
         while(true) {
             if(m_repair.dedupIdx >= m_repair.sizeBuckets.size()) return false;
-            Dictionary bucket = Dictionary(m_repair.sizeBuckets[int(m_repair.dedupIdx)]);
-            const Variant vn  = bucket["names"];
-            if(vn.get_type() != Variant::Type::ARRAY) { ++m_repair.dedupIdx; continue; }
-            Array names = Array(vn);
-            if(names.size() < 2) {
-                if(!m_repair.dedupIsGltfWave) { bucket.erase("_j"); m_repair.sizeBuckets[int(m_repair.dedupIdx)] = bucket; }
+            Dictionary currentBucket = Dictionary(m_repair.sizeBuckets[int(m_repair.dedupIdx)]);
+            const Variant namesVariant = currentBucket["names"];
+            if(namesVariant.get_type() != Variant::Type::ARRAY) { ++m_repair.dedupIdx; continue; }
+            Array bucketFilenames = Array(namesVariant);
+            if(bucketFilenames.size() < 2) {
+                if(!m_repair.dedupIsGltfWave) { currentBucket.erase(DEDUP_COMPARE_INDEX_KEY); m_repair.sizeBuckets[int(m_repair.dedupIdx)] = currentBucket; }
                 ++m_repair.dedupIdx;
                 continue;
             }
-            int64_t jj = bucket.has("_j") ? int64_t(bucket["_j"]) : 1LL;
-            if(jj <= 0) jj = 1LL;
-            if(jj >= int64_t(names.size())) {
-                names.remove_at(0);
-                jj = 1LL;
-                repairDedupPersistBucket(bucket, names, jj);
-                if(names.size() < 2) ++m_repair.dedupIdx;
+            int64_t compareIndex = currentBucket.has(DEDUP_COMPARE_INDEX_KEY) ? int64_t(currentBucket[DEDUP_COMPARE_INDEX_KEY]) : 1LL;
+            if(compareIndex <= 0) compareIndex = 1LL;
+            if(compareIndex >= int64_t(bucketFilenames.size())) {
+                bucketFilenames.remove_at(0);
+                compareIndex = 1LL;
+                repairDedupPersistBucket(currentBucket, bucketFilenames, compareIndex);
+                if(bucketFilenames.size() < 2) ++m_repair.dedupIdx;
                 return true;
             }
-            const String first = String(names[0]);
-            const String cand  = String(names[int(jj)]);
+            const String canonicalFilename  = String(bucketFilenames[0]);
+            const String candidateFilename  = String(bucketFilenames[int(compareIndex)]);
             if(m_repair.dedupIsGltfWave) {
-                const uint64_t t_cmp = Time::get_singleton()->get_ticks_usec();
-                if(!first.to_lower().ends_with(".gltf") || !cand.to_lower().ends_with(".gltf")) {
-                    ++jj; repairDedupPersistJjOnly(bucket, jj); debitTimeBudgetFromTicks(t_cmp); return true;
+                const uint64_t compareStartUsec = Time::get_singleton()->get_ticks_usec();
+                if(!canonicalFilename.to_lower().ends_with(".gltf") || !candidateFilename.to_lower().ends_with(".gltf")) {
+                    ++compareIndex; repairDedupPersistJjOnly(currentBucket, compareIndex); debitTimeBudgetFromTicks(compareStartUsec); return true;
                 }
-                const Dictionary A_assets = manifestAssetsDict();
-                if(!A_assets.has(Variant(first)) || !A_assets.has(Variant(cand))) {
-                    ++jj; repairDedupPersistJjOnly(bucket, jj); debitTimeBudgetFromTicks(t_cmp); return true;
+                const Dictionary assetsDict = manifestAssetsDict();
+                if(!assetsDict.has(Variant(canonicalFilename)) || !assetsDict.has(Variant(candidateFilename))) {
+                    ++compareIndex; repairDedupPersistJjOnly(currentBucket, compareIndex); debitTimeBudgetFromTicks(compareStartUsec); return true;
                 }
-                const bool sameG = fileBinaryEqual(m_assetPackPath.path_join(first), m_assetPackPath.path_join(cand));
-                debitTimeBudgetFromTicks(t_cmp);
-                if(!sameG) { ++jj; repairDedupPersistJjOnly(bucket, jj); return true; }
-                const uint64_t t_merge = Time::get_singleton()->get_ticks_usec();
-                mergeRepairDuplicateGltfPackFiles(first, cand, true, true);
-                debitTimeBudgetFromTicks(t_merge);
-                names.remove_at(int(jj));
-                jj = jj < int64_t(names.size()) ? jj : 1LL;
-                if(jj <= 0) jj = 1LL;
-                repairDedupPersistBucket(bucket, names, jj);
+                const bool filesAreIdentical = fileBinaryEqual(m_assetPackPath.path_join(canonicalFilename), m_assetPackPath.path_join(candidateFilename));
+                debitTimeBudgetFromTicks(compareStartUsec);
+                if(!filesAreIdentical) { ++compareIndex; repairDedupPersistJjOnly(currentBucket, compareIndex); return true; }
+                const uint64_t mergeStartUsec = Time::get_singleton()->get_ticks_usec();
+                mergeRepairDuplicateGltfPackFiles(canonicalFilename, candidateFilename, true, true);
+                debitTimeBudgetFromTicks(mergeStartUsec);
+                bucketFilenames.remove_at(int(compareIndex));
+                compareIndex = compareIndex < int64_t(bucketFilenames.size()) ? compareIndex : 1LL;
+                if(compareIndex <= 0) compareIndex = 1LL;
+                repairDedupPersistBucket(currentBucket, bucketFilenames, compareIndex);
                 return true;
             }
-            const Dictionary binG = manifestBinDict();
-            const Dictionary texG = manifestTexDict();
-            const uint64_t t_cmp  = Time::get_singleton()->get_ticks_usec();
-            bool sameBytes = false;
-            if(binG.has(Variant(first)) && binG.has(Variant(cand)))
-                sameBytes = fileBinaryEqual(m_assetPackPath.path_join(first), m_assetPackPath.path_join(cand));
-            else if(texG.has(Variant(first)) && texG.has(Variant(cand)))
-                sameBytes = fileBinaryEqual(m_assetPackPath.path_join(first), m_assetPackPath.path_join(cand));
-            else { ++jj; repairDedupPersistJjOnly(bucket, jj); debitTimeBudgetFromTicks(t_cmp); return true; }
-            debitTimeBudgetFromTicks(t_cmp);
-            if(!sameBytes) { ++jj; repairDedupPersistJjOnly(bucket, jj); return true; }
-            const char* const tbl  = cand.to_lower().ends_with(".bin") ? BIN_DATA_KEY : TEX_DATA_KEY;
-            const uint64_t t_merge = Time::get_singleton()->get_ticks_usec();
-            mergeRepairPackSidecarsInTable(tbl, first, cand, true);
-            debitTimeBudgetFromTicks(t_merge);
-            names.remove_at(int(jj));
-            jj = jj < int64_t(names.size()) ? jj : 1LL;
-            if(jj <= 0) jj = 1LL;
-            repairDedupPersistBucket(bucket, names, jj);
+            const Dictionary binTable = manifestBinDict();
+            const Dictionary texTable = manifestTexDict();
+            const uint64_t compareStartUsec = Time::get_singleton()->get_ticks_usec();
+            bool filesAreIdentical = false;
+            if(binTable.has(Variant(canonicalFilename)) && binTable.has(Variant(candidateFilename)))
+                filesAreIdentical = fileBinaryEqual(m_assetPackPath.path_join(canonicalFilename), m_assetPackPath.path_join(candidateFilename));
+            else if(texTable.has(Variant(canonicalFilename)) && texTable.has(Variant(candidateFilename)))
+                filesAreIdentical = fileBinaryEqual(m_assetPackPath.path_join(canonicalFilename), m_assetPackPath.path_join(candidateFilename));
+            else { ++compareIndex; repairDedupPersistJjOnly(currentBucket, compareIndex); debitTimeBudgetFromTicks(compareStartUsec); return true; }
+            debitTimeBudgetFromTicks(compareStartUsec);
+            if(!filesAreIdentical) { ++compareIndex; repairDedupPersistJjOnly(currentBucket, compareIndex); return true; }
+            const char* const sidecarTableName = candidateFilename.to_lower().ends_with(".bin") ? BIN_DATA_KEY : TEX_DATA_KEY;
+            const uint64_t mergeStartUsec = Time::get_singleton()->get_ticks_usec();
+            mergeRepairPackSidecarsInTable(sidecarTableName, canonicalFilename, candidateFilename, true);
+            debitTimeBudgetFromTicks(mergeStartUsec);
+            bucketFilenames.remove_at(int(compareIndex));
+            compareIndex = compareIndex < int64_t(bucketFilenames.size()) ? compareIndex : 1LL;
+            if(compareIndex <= 0) compareIndex = 1LL;
+            repairDedupPersistBucket(currentBucket, bucketFilenames, compareIndex);
             return true;
         }
     }
 
-    void Importer::repairDedupPersistJjOnly(Dictionary& p_bucket, int64_t p_jj) {
-        p_bucket["_j"] = p_jj;
+    void Importer::repairDedupPersistJjOnly(Dictionary& p_bucket, int64_t p_compare_index) {
+        p_bucket[DEDUP_COMPARE_INDEX_KEY] = p_compare_index;
         m_repair.sizeBuckets[int(m_repair.dedupIdx)] = p_bucket;
     }
 
-    void Importer::repairDedupPersistBucket(Dictionary& p_bucket, const Array& p_names, int64_t p_jj) {
-        p_bucket["names"] = p_names;
-        p_bucket["_j"]    = p_jj;
+    void Importer::repairDedupPersistBucket(Dictionary& p_bucket, const Array& p_names, int64_t p_compare_index) {
+        p_bucket["names"]                  = p_names;
+        p_bucket[DEDUP_COMPARE_INDEX_KEY] = p_compare_index;
         m_repair.sizeBuckets[int(m_repair.dedupIdx)] = p_bucket;
     }
 
     void Importer::repairCollectDeletionCandidates() {
         pruneUnreferencedSidecarsAndEnqueue(m_repair.deletions);
-        Dictionary allowed;
-        buildAllowedReferencedPackFilenames(allowed);
-        const Dictionary A_assets = manifestAssetsDict();
-        const String capRel       = String("capture");
-        const String capAbs       = m_assetPackPath.path_join(capRel);
-        Array captureFiles;
-        enumerateFilesInDirNonRecursive(capAbs, captureFiles);
-        for(int i = 0; i < captureFiles.size(); ++i) {
-            const String q = String(captureFiles[i]);
-            if(q.to_lower().ends_with(".png")) {
-                const String gltfKey = q.get_basename() + String(".gltf");
-                if(!A_assets.has(Variant(gltfKey)))
-                    repairEnqueueDeletionRel(capRel.path_join(q));
+        Dictionary referencedFilenames;
+        buildAllowedReferencedPackFilenames(referencedFilenames);
+        const Dictionary assetsDict = manifestAssetsDict();
+        const String captureSubdir  = String("capture");
+        const String captureAbsDir  = m_assetPackPath.path_join(captureSubdir);
+        Array captureDirectoryFilenames;
+        enumerateFilesInDirNonRecursive(captureAbsDir, captureDirectoryFilenames);
+        for(int i = 0; i < captureDirectoryFilenames.size(); ++i) {
+            const String captureFilename = String(captureDirectoryFilenames[i]);
+            if(captureFilename.to_lower().ends_with(".png")) {
+                const String expectedGltfFilename = captureFilename.get_basename() + String(".gltf");
+                if(!assetsDict.has(Variant(expectedGltfFilename)))
+                    repairEnqueueDeletionRel(captureSubdir.path_join(captureFilename));
             }
         }
-        Array rootFiles;
-        enumerateFilesInDirNonRecursive(m_assetPackPath, rootFiles);
-        for(int i = 0; i < rootFiles.size(); ++i) {
-            const String rn  = String(rootFiles[i]);
-            const String rnl = rn.to_lower();
-            const bool extOk = rnl.ends_with(".gltf") || rnl.ends_with(".bin")
-                || rnl.ends_with(".png") || rnl.ends_with(".jpg") || rnl.ends_with(".jpeg");
-            if(extOk && !allowed.has(Variant(rn))) repairEnqueueDeletionRel(rn);
+        Array packRootFilenames;
+        enumerateFilesInDirNonRecursive(m_assetPackPath, packRootFilenames);
+        for(int i = 0; i < packRootFilenames.size(); ++i) {
+            const String rootFilename      = String(packRootFilenames[i]);
+            const String rootFilenameLower = rootFilename.to_lower();
+            const bool hasKnownExtension   = rootFilenameLower.ends_with(".gltf") || rootFilenameLower.ends_with(".bin")
+                || rootFilenameLower.ends_with(".png") || rootFilenameLower.ends_with(".jpg") || rootFilenameLower.ends_with(".jpeg");
+            if(hasKnownExtension && !referencedFilenames.has(Variant(rootFilename))) repairEnqueueDeletionRel(rootFilename);
         }
     }
 
@@ -598,44 +649,44 @@ namespace ImportExportModule {
     void Importer::mergeRepairPackSidecarsInTable(const String& p_table, const String& p_keep,
         const String& p_drop, bool p_defer_delete) {
         if(!m_assetsPackManifest.has(p_table)) return;
-        Dictionary ttbl = Dictionary(m_assetsPackManifest[p_table]);
-        if(!ttbl.has(Variant(p_keep)) || !ttbl.has(Variant(p_drop))) return;
+        Dictionary sidecarTable = Dictionary(m_assetsPackManifest[p_table]);
+        if(!sidecarTable.has(Variant(p_keep)) || !sidecarTable.has(Variant(p_drop))) return;
         if(m_assetsPackManifest.has(ASSETS_KEY)) {
-            Dictionary A   = Dictionary(m_assetsPackManifest[ASSETS_KEY]);
-            const Array ak = A.keys();
-            for(int ax = 0; ax < ak.size(); ++ax) {
-                const String gnm = String(ak[ax]);
-                if(!A.has(Variant(gnm))) continue;
-                const Dictionary gdata = Dictionary(A[gnm]);
-                Dictionary bd, td;
-                extractBinTexMapsFromAssetRow(gdata, bd, td);
-                bool mut = false;
-                if(bd.has(Variant(p_drop)) && p_table == String(BIN_DATA_KEY)) {
-                    const Variant v = bd[p_drop];
-                    bd.erase(Variant(p_drop));
-                    if(!bd.has(Variant(p_keep))) bd[Variant(p_keep)] = v;
-                    mut = true;
+            Dictionary assetsDict  = Dictionary(m_assetsPackManifest[ASSETS_KEY]);
+            const Array assetKeys  = assetsDict.keys();
+            for(int ax = 0; ax < assetKeys.size(); ++ax) {
+                const String gltfFilename = String(assetKeys[ax]);
+                if(!assetsDict.has(Variant(gltfFilename))) continue;
+                const Dictionary assetRow = Dictionary(assetsDict[gltfFilename]);
+                Dictionary binSidecars, texSidecars;
+                extractBinTexMapsFromAssetRow(assetRow, binSidecars, texSidecars);
+                bool assetWasModified = false;
+                if(binSidecars.has(Variant(p_drop)) && p_table == String(BIN_DATA_KEY)) {
+                    const Variant droppedBinRow = binSidecars[p_drop];
+                    binSidecars.erase(Variant(p_drop));
+                    if(!binSidecars.has(Variant(p_keep))) binSidecars[Variant(p_keep)] = droppedBinRow;
+                    assetWasModified = true;
                 }
-                if(td.has(Variant(p_drop)) && p_table == String(TEX_DATA_KEY)) {
-                    const Variant v = td[p_drop];
-                    td.erase(Variant(p_drop));
-                    if(!td.has(Variant(p_keep))) td[Variant(p_keep)] = v;
-                    mut = true;
+                if(texSidecars.has(Variant(p_drop)) && p_table == String(TEX_DATA_KEY)) {
+                    const Variant droppedTexRow = texSidecars[p_drop];
+                    texSidecars.erase(Variant(p_drop));
+                    if(!texSidecars.has(Variant(p_keep))) texSidecars[Variant(p_keep)] = droppedTexRow;
+                    assetWasModified = true;
                 }
-                if(mut) {
-                    Dictionary ng = gdata;
-                    ng[BIN_ROW_KEY] = bd;
-                    ng[TEX_ROW_KEY] = td;
-                    tryReplaceJsonQuotedStringInFile(m_assetPackPath.path_join(gnm), p_drop, p_keep);
-                    const Ref<FileAccess> grf = FileAccess::open(m_assetPackPath.path_join(gnm), FileAccess::ModeFlags::READ);
-                    if(grf.is_valid()) ng[WEIGHT_KEY] = int64_t(grf->get_length());
-                    A[Variant(gnm)] = ng;
+                if(assetWasModified) {
+                    Dictionary updatedAssetRow = assetRow;
+                    updatedAssetRow[BIN_ROW_KEY] = binSidecars;
+                    updatedAssetRow[TEX_ROW_KEY] = texSidecars;
+                    tryReplaceJsonQuotedStringInFile(m_assetPackPath.path_join(gltfFilename), p_drop, p_keep);
+                    const Ref<FileAccess> gltfFile = FileAccess::open(m_assetPackPath.path_join(gltfFilename), FileAccess::ModeFlags::READ);
+                    if(gltfFile.is_valid()) updatedAssetRow[WEIGHT_KEY] = int64_t(gltfFile->get_length());
+                    assetsDict[Variant(gltfFilename)] = updatedAssetRow;
                 }
             }
-            m_assetsPackManifest[ASSETS_KEY] = A;
+            m_assetsPackManifest[ASSETS_KEY] = assetsDict;
         }
-        ttbl.erase(Variant(p_drop));
-        m_assetsPackManifest[p_table] = ttbl;
+        sidecarTable.erase(Variant(p_drop));
+        m_assetsPackManifest[p_table] = sidecarTable;
         if(p_defer_delete) repairEnqueueDeletionRel(p_drop);
         else               deletePackRelativeFile(p_drop);
     }
@@ -643,19 +694,19 @@ namespace ImportExportModule {
     const bool Importer::mergeRepairDuplicateGltfPackFiles(const String& p_keep, const String& p_drop,
         bool p_defer_delete, bool p_already_equal) {
         if(!m_assetsPackManifest.has(ASSETS_KEY)) return false;
-        Dictionary A = Dictionary(m_assetsPackManifest[ASSETS_KEY]);
-        if(!A.has(Variant(p_keep)) || !A.has(Variant(p_drop))) return false;
+        Dictionary assetsDict = Dictionary(m_assetsPackManifest[ASSETS_KEY]);
+        if(!assetsDict.has(Variant(p_keep)) || !assetsDict.has(Variant(p_drop))) return false;
         if(!p_already_equal && !fileBinaryEqual(m_assetPackPath.path_join(p_keep), m_assetPackPath.path_join(p_drop)))
             return false;
-        A.erase(Variant(p_drop));
-        m_assetsPackManifest[ASSETS_KEY] = A;
-        const String dropPng = packRelativeCapturePngForGltfPackName(p_drop);
+        assetsDict.erase(Variant(p_drop));
+        m_assetsPackManifest[ASSETS_KEY] = assetsDict;
+        const String droppedThumbnailPath = packRelativeCapturePngForGltfPackName(p_drop);
         if(p_defer_delete) {
             repairEnqueueDeletionRel(p_drop);
-            repairEnqueueDeletionRel(dropPng);
+            repairEnqueueDeletionRel(droppedThumbnailPath);
         } else {
             deletePackRelativeFile(p_drop);
-            deletePackRelativeFile(dropPng);
+            deletePackRelativeFile(droppedThumbnailPath);
         }
         return true;
     }
@@ -663,11 +714,11 @@ namespace ImportExportModule {
     void Importer::listPackRootGltfFileNames(Array& p_out_base_names) {
         p_out_base_names.clear();
         if(m_assetPackPath.is_empty()) return;
-        Array names;
-        enumerateFilesInDirNonRecursive(m_assetPackPath, names);
-        for(int i = 0; i < names.size(); ++i) {
-            const String cur = String(names[i]);
-            if(cur.to_lower().ends_with(".gltf")) p_out_base_names.append(cur);
+        Array allPackRootFilenames;
+        enumerateFilesInDirNonRecursive(m_assetPackPath, allPackRootFilenames);
+        for(int i = 0; i < allPackRootFilenames.size(); ++i) {
+            const String filename = String(allPackRootFilenames[i]);
+            if(filename.to_lower().ends_with(".gltf")) p_out_base_names.append(filename);
         }
     }
 

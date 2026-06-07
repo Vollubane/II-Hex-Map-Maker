@@ -1,6 +1,7 @@
-[gd_scene load_steps=3 format=3 uid="uid://dmmakl4k6gegg"]
+[gd_scene load_steps=4 format=3 uid="uid://dmmakl4k6gegg"]
 
 [ext_resource type="PackedScene" uid="uid://bncpp00u1fd34" path="res://Scene/UI Node/MainMenu.tscn" id="1_h0j25"]
+[ext_resource type="PackedScene" uid="uid://bw60vnt458of8" path="res://Scene/UI Node/Elements/LoadingPanel.tscn" id="2_lp"]
 
 [sub_resource type="Environment" id="Environment_h0j25"]
 background_mode = 1
@@ -15,3 +16,8 @@ editor_description = "The root node of the app, don't use c++ it's only to load 
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_h0j25")
+
+[node name="LoadingLayer" type="CanvasLayer" parent="."]
+layer = 128
+
+[node name="LoadingPanel" parent="LoadingLayer" instance=ExtResource("2_lp")]

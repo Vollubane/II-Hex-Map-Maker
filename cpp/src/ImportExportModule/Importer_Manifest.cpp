@@ -10,23 +10,23 @@ using namespace godot;
 namespace ImportExportModule {
 
     const Dictionary Importer::manifestAssetsDict() {
-        const Variant v = m_assetsPackManifest.has(ASSETS_KEY) ? m_assetsPackManifest[ASSETS_KEY] : Variant();
-        return v.get_type() == Variant::Type::DICTIONARY ? Dictionary(v) : Dictionary();
+        const Variant value = m_assetsPackManifest.has(ASSETS_KEY) ? m_assetsPackManifest[ASSETS_KEY] : Variant();
+        return value.get_type() == Variant::Type::DICTIONARY ? Dictionary(value) : Dictionary();
     }
 
     const Dictionary Importer::manifestBinDict() {
-        const Variant v = m_assetsPackManifest.has(BIN_DATA_KEY) ? m_assetsPackManifest[BIN_DATA_KEY] : Variant();
-        return v.get_type() == Variant::Type::DICTIONARY ? Dictionary(v) : Dictionary();
+        const Variant value = m_assetsPackManifest.has(BIN_DATA_KEY) ? m_assetsPackManifest[BIN_DATA_KEY] : Variant();
+        return value.get_type() == Variant::Type::DICTIONARY ? Dictionary(value) : Dictionary();
     }
 
     const Dictionary Importer::manifestTexDict() {
-        const Variant v = m_assetsPackManifest.has(TEX_DATA_KEY) ? m_assetsPackManifest[TEX_DATA_KEY] : Variant();
-        return v.get_type() == Variant::Type::DICTIONARY ? Dictionary(v) : Dictionary();
+        const Variant value = m_assetsPackManifest.has(TEX_DATA_KEY) ? m_assetsPackManifest[TEX_DATA_KEY] : Variant();
+        return value.get_type() == Variant::Type::DICTIONARY ? Dictionary(value) : Dictionary();
     }
 
     const Array Importer::manifestGroupsArray() {
-        const Variant v = m_assetsPackManifest.has(GROUPS_KEY) ? m_assetsPackManifest[GROUPS_KEY] : Variant();
-        return v.get_type() == Variant::Type::ARRAY ? Array(v) : Array();
+        const Variant value = m_assetsPackManifest.has(GROUPS_KEY) ? m_assetsPackManifest[GROUPS_KEY] : Variant();
+        return value.get_type() == Variant::Type::ARRAY ? Array(value) : Array();
     }
 
     const Dictionary Importer::makeSidecarRow(const String& p_true_path, int64_t p_weight) {
@@ -50,21 +50,21 @@ namespace ImportExportModule {
 
     const Dictionary Importer::getDictionaryFromJsonPath(const String& p_path) {
         if(!FileAccess::file_exists(p_path)) return {};
-        const Ref<FileAccess> f = FileAccess::open(p_path, FileAccess::ModeFlags::READ);
-        if(f.is_null()) return {};
-        Ref<JSON> j;
-        j.instantiate();
-        if(j->parse(f->get_as_text()) != OK) return {};
-        const Variant v = j->get_data();
-        return v.get_type() == Variant::Type::DICTIONARY ? Dictionary(v) : Dictionary();
+        const Ref<FileAccess> jsonFile = FileAccess::open(p_path, FileAccess::ModeFlags::READ);
+        if(jsonFile.is_null()) return {};
+        Ref<JSON> jsonParser;
+        jsonParser.instantiate();
+        if(jsonParser->parse(jsonFile->get_as_text()) != OK) return {};
+        const Variant parsedData = jsonParser->get_data();
+        return parsedData.get_type() == Variant::Type::DICTIONARY ? Dictionary(parsedData) : Dictionary();
     }
 
     void Importer::ensureManifestSidecarRow(const String& p_table, const String& p_key, const String& p_true_path, int64_t p_weight) {
         ensureManifestDefaultTables();
-        Dictionary tbl = Dictionary(m_assetsPackManifest[p_table]);
-        if(tbl.has(Variant(p_key))) return;
-        tbl[Variant(p_key)] = makeSidecarRow(p_true_path, p_weight);
-        m_assetsPackManifest[p_table] = tbl;
+        Dictionary sidecarTable = Dictionary(m_assetsPackManifest[p_table]);
+        if(sidecarTable.has(Variant(p_key))) return;
+        sidecarTable[Variant(p_key)] = makeSidecarRow(p_true_path, p_weight);
+        m_assetsPackManifest[p_table] = sidecarTable;
     }
 
     const bool Importer::loadPackManifestFromDiskOrDestruct(const String& p_pack_root, const String& p_context) {
@@ -94,58 +94,63 @@ namespace ImportExportModule {
 
     const bool Importer::writeManifestToDisk() {
         m_assetsPackManifest["date"] = Time::get_singleton()->get_datetime_dict_from_system();
-        const String p = m_assetPackPath.path_join(String(M_MANIFEST_JSON_FILENAME.c_str()));
-        const Ref<FileAccess> w = FileAccess::open(p, FileAccess::ModeFlags::WRITE);
-        if(w.is_null()) {
+        const String manifestAbsPath = m_assetPackPath.path_join(String(M_MANIFEST_JSON_FILENAME.c_str()));
+        const Ref<FileAccess> writeFile = FileAccess::open(manifestAbsPath, FileAccess::ModeFlags::WRITE);
+        if(writeFile.is_null()) {
             UtilityFunctions::push_error(String("Importer: cannot open ")
-                + String(M_MANIFEST_JSON_FILENAME.c_str()) + String(" for write: ") + p);
+                + String(M_MANIFEST_JSON_FILENAME.c_str()) + String(" for write: ") + manifestAbsPath);
             return false;
         }
-        w->store_string(JSON::stringify(m_assetsPackManifest, "\t"));
+        writeFile->store_string(JSON::stringify(m_assetsPackManifest, "\t"));
         return true;
     }
 
     void Importer::recomputeGlobalSizesAndCount() {
-        const uint64_t tot = computeTotalWeightBytes();
-        m_assetsPackManifest["poid_bytes"] = int64_t(tot);
-        m_assetsPackManifest["poid"]       = String::num(double(tot) / (1024.0 * 1024.0), 3) + " Mo";
+        const uint64_t totalSizeBytes = computeTotalWeightBytes();
+        m_assetsPackManifest["poid_bytes"] = int64_t(totalSizeBytes);
+        m_assetsPackManifest["poid"]       = String::num(double(totalSizeBytes) / (1024.0 * 1024.0), 3) + " Mo";
         m_assetsPackManifest["asset"]      = int64_t(manifestAssetsDict().size());
     }
 
     const uint64_t Importer::computeTotalWeightBytes() {
-        uint64_t tot = 0;
-        const auto sum_table = [&](const Dictionary& T) {
-            const Array kk = T.keys();
-            for(int i = 0; i < kk.size(); ++i) {
-                const Dictionary d = T[kk[i]];
-                if(d.has(WEIGHT_KEY)) tot += uint64_t(int64_t(d[WEIGHT_KEY]));
+        uint64_t totalSizeBytes = 0;
+        const auto sumWeightsInTable = [&](const Dictionary& sidecarTable) {
+            const Array sidecarKeys = sidecarTable.keys();
+            for(int i = 0; i < sidecarKeys.size(); ++i) {
+                const Dictionary sidecarRow = sidecarTable[sidecarKeys[i]];
+                if(sidecarRow.has(WEIGHT_KEY)) totalSizeBytes += uint64_t(int64_t(sidecarRow[WEIGHT_KEY]));
             }
         };
-        sum_table(manifestAssetsDict());
-        sum_table(manifestBinDict());
-        sum_table(manifestTexDict());
-        return tot;
+        sumWeightsInTable(manifestAssetsDict());
+        sumWeightsInTable(manifestBinDict());
+        sumWeightsInTable(manifestTexDict());
+        return totalSizeBytes;
     }
 
     void Importer::pruneEmptyGroupsInManifest() {
         if(!m_assetsPackManifest.has(GROUPS_KEY)) return;
-        const Dictionary A = manifestAssetsDict();
-        const Array ks = A.keys();
+        const Dictionary assetsDict = manifestAssetsDict();
+        const Array assetKeys = assetsDict.keys();
         Dictionary usedGroups;
-        for(int i = 0; i < ks.size(); ++i) {
-            if(!A.has(ks[i])) continue;
-            const Dictionary row = Dictionary(A[ks[i]]);
-            if(!row.has(GROUP_KEY)) continue;
-            const String g = String(row[GROUP_KEY]).strip_edges();
-            if(!g.is_empty()) usedGroups[g] = true;
+        for(int i = 0; i < assetKeys.size(); ++i) {
+            if(!assetsDict.has(assetKeys[i])) continue;
+            const Dictionary assetRow = Dictionary(assetsDict[assetKeys[i]]);
+            if(!assetRow.has(GROUP_KEY)) continue;
+            const String groupName = String(assetRow[GROUP_KEY]).strip_edges();
+            if(!groupName.is_empty()) usedGroups[groupName] = true;
         }
-        const Array g = manifestGroupsArray();
-        Array kept;
-        for(int i = 0; i < g.size(); ++i) {
-            const String gv = String(g[i]).strip_edges();
-            if(!gv.is_empty() && usedGroups.has(gv)) kept.append(gv);
+        const Array allGroups = manifestGroupsArray();
+        Array keptGroups;
+        for(int i = 0; i < allGroups.size(); ++i) {
+            const String currentGroupName = String(allGroups[i]).strip_edges();
+            if(!currentGroupName.is_empty() && usedGroups.has(currentGroupName)) keptGroups.append(currentGroupName);
         }
-        m_assetsPackManifest[GROUPS_KEY] = kept;
+        m_assetsPackManifest[GROUPS_KEY] = keptGroups;
+    }
+
+    bool Importer::recomputeAndWriteManifest(const String& p_pack_root) {
+        if(!loadPackManifestFromDiskOrDestruct(p_pack_root, "recomputeAndWriteManifest")) return false;
+        return commitPackManifestToDisk(true);
     }
 
     const bool Importer::runFullManifestSidecarAndGltfDedupCommit(bool p_prune_empty_groups) {
@@ -163,115 +168,115 @@ namespace ImportExportModule {
     }
 
     const String Importer::fingerprintManifestSidecarDict(const Dictionary& p_dict) {
-        Array kk = p_dict.keys();
-        kk.sort();
-        String acc;
-        for(int i = 0; i < kk.size(); ++i)
-            acc += String(kk[i]) + String("=") + String(p_dict[kk[i]]) + String(";");
-        return acc;
+        Array sortedKeys = p_dict.keys();
+        sortedKeys.sort();
+        String fingerprint;
+        for(int i = 0; i < sortedKeys.size(); ++i)
+            fingerprint += String(sortedKeys[i]) + String("=") + String(p_dict[sortedKeys[i]]) + String(";");
+        return fingerprint;
     }
 
     void Importer::buildAllowedReferencedPackFilenames(Dictionary& p_out_allow) {
         p_out_allow.clear();
-        const auto fill = [&](const Dictionary& T) {
-            const Array kk = T.keys();
-            for(int i = 0; i < kk.size(); ++i) p_out_allow[Variant(String(kk[i]))] = true;
+        const auto addTableKeysToAllowed = [&](const Dictionary& manifestTable) {
+            const Array tableKeys = manifestTable.keys();
+            for(int i = 0; i < tableKeys.size(); ++i) p_out_allow[Variant(String(tableKeys[i]))] = true;
         };
-        fill(manifestAssetsDict());
-        fill(manifestBinDict());
-        fill(manifestTexDict());
+        addTableKeysToAllowed(manifestAssetsDict());
+        addTableKeysToAllowed(manifestBinDict());
+        addTableKeysToAllowed(manifestTexDict());
         p_out_allow[Variant(String(M_MANIFEST_JSON_FILENAME.c_str()))] = true;
     }
 
     void Importer::recordGltfRowInManifest(const Dictionary& p_item) {
-        const String key = p_item["pack_name"];
-        Dictionary a = manifestAssetsDict();
-        Dictionary row;
-        row[GROUP_KEY]     = p_item["group"];
-        row[TRUE_PATH_KEY] = p_item["true_path"];
-        row[BIN_ROW_KEY]   = p_item.has(BIN_ROW_KEY)  ? p_item[BIN_ROW_KEY]  : Variant(Dictionary());
-        row[TEX_ROW_KEY]   = p_item.has(TEX_ROW_KEY)  ? p_item[TEX_ROW_KEY]  : Variant(Dictionary());
-        row[WEIGHT_KEY]    = p_item["gltf_size"];
-        a[Variant(key)] = row;
-        m_assetsPackManifest[ASSETS_KEY] = a;
-        const String gp = p_item["group"].operator String();
-        if(!gp.is_empty()) {
-            Array g = manifestGroupsArray();
-            bool found = false;
-            for(int i = 0; i < g.size(); ++i) {
-                if(String(g[i]) == gp) { found = true; break; }
+        const String assetPackFilename = p_item["pack_name"];
+        Dictionary assetsDict = manifestAssetsDict();
+        Dictionary assetRow;
+        assetRow[GROUP_KEY]     = p_item["group"];
+        assetRow[TRUE_PATH_KEY] = p_item["true_path"];
+        assetRow[BIN_ROW_KEY]   = p_item.has(BIN_ROW_KEY)  ? p_item[BIN_ROW_KEY]  : Variant(Dictionary());
+        assetRow[TEX_ROW_KEY]   = p_item.has(TEX_ROW_KEY)  ? p_item[TEX_ROW_KEY]  : Variant(Dictionary());
+        assetRow[WEIGHT_KEY]    = p_item["gltf_size"];
+        assetsDict[Variant(assetPackFilename)] = assetRow;
+        m_assetsPackManifest[ASSETS_KEY] = assetsDict;
+        const String groupName = p_item["group"].operator String();
+        if(!groupName.is_empty()) {
+            Array allGroups = manifestGroupsArray();
+            bool alreadyListed = false;
+            for(int i = 0; i < allGroups.size(); ++i) {
+                if(String(allGroups[i]) == groupName) { alreadyListed = true; break; }
             }
-            if(!found) g.append(gp);
-            m_assetsPackManifest[GROUPS_KEY] = g;
+            if(!alreadyListed) allGroups.append(groupName);
+            m_assetsPackManifest[GROUPS_KEY] = allGroups;
         }
     }
 
     void Importer::deduplicateOneSidecarTable(const String& p_table_name) {
         if(!m_assetsPackManifest.has(p_table_name)) return;
-        Dictionary T = m_assetsPackManifest[p_table_name];
-        const Array keys = T.keys();
-        Dictionary groupKeyToNames;
-        for(int i = 0; i < keys.size(); ++i) {
-            const String pk = String(keys[i]);
-            if(!T.has(Variant(pk))) continue;
-            const Dictionary row = T[pk];
-            if(!row.has(TRUE_PATH_KEY) || !row.has(WEIGHT_KEY)) continue;
-            const String gk = String(row[TRUE_PATH_KEY]) + String("||") + String::num_int64(int64_t(row[WEIGHT_KEY]));
-            Array names;
-            if(groupKeyToNames.has(Variant(gk))) names = groupKeyToNames[Variant(gk)];
-            bool found = false;
-            for(int vi = 0; vi < names.size(); ++vi) {
-                if(names[vi] == Variant(pk)) { found = true; break; }
+        Dictionary sidecarTable = m_assetsPackManifest[p_table_name];
+        const Array sidecarFilenames = sidecarTable.keys();
+        Dictionary deduplicationGroups;
+        for(int i = 0; i < sidecarFilenames.size(); ++i) {
+            const String sidecarFilename = String(sidecarFilenames[i]);
+            if(!sidecarTable.has(Variant(sidecarFilename))) continue;
+            const Dictionary sidecarRow = sidecarTable[sidecarFilename];
+            if(!sidecarRow.has(TRUE_PATH_KEY) || !sidecarRow.has(WEIGHT_KEY)) continue;
+            const String deduplicationKey = String(sidecarRow[TRUE_PATH_KEY]) + String("||") + String::num_int64(int64_t(sidecarRow[WEIGHT_KEY]));
+            Array duplicateNames;
+            if(deduplicationGroups.has(Variant(deduplicationKey))) duplicateNames = deduplicationGroups[Variant(deduplicationKey)];
+            bool alreadyAdded = false;
+            for(int vi = 0; vi < duplicateNames.size(); ++vi) {
+                if(duplicateNames[vi] == Variant(sidecarFilename)) { alreadyAdded = true; break; }
             }
-            if(!found) names.append(pk);
-            groupKeyToNames[Variant(gk)] = names;
+            if(!alreadyAdded) duplicateNames.append(sidecarFilename);
+            deduplicationGroups[Variant(deduplicationKey)] = duplicateNames;
         }
-        const Array gks = groupKeyToNames.keys();
-        for(int gi = 0; gi < gks.size(); ++gi) {
-            Array nms = groupKeyToNames[gks[gi]];
-            if(nms.size() < 2) continue;
-            const String canon = String(nms[0]);
-            int j = 1;
-            while(j < nms.size()) {
-                const String dup = String(nms[j]);
-                Dictionary Tnow = Dictionary(m_assetsPackManifest[p_table_name]);
-                if(!Tnow.has(Variant(canon)) || !Tnow.has(Variant(dup))) { nms.remove_at(j); continue; }
-                if(!fileBinaryEqual(m_assetPackPath.path_join(canon), m_assetPackPath.path_join(dup))) { ++j; continue; }
-                mergeRepairPackSidecarsInTable(p_table_name, canon, dup, false);
-                nms.remove_at(j);
+        const Array deduplicationKeys = deduplicationGroups.keys();
+        for(int gi = 0; gi < deduplicationKeys.size(); ++gi) {
+            Array duplicateNames = deduplicationGroups[deduplicationKeys[gi]];
+            if(duplicateNames.size() < 2) continue;
+            const String canonicalName = String(duplicateNames[0]);
+            int compareIndex = 1;
+            while(compareIndex < duplicateNames.size()) {
+                const String duplicateName = String(duplicateNames[compareIndex]);
+                Dictionary currentTable = Dictionary(m_assetsPackManifest[p_table_name]);
+                if(!currentTable.has(Variant(canonicalName)) || !currentTable.has(Variant(duplicateName))) { duplicateNames.remove_at(compareIndex); continue; }
+                if(!fileBinaryEqual(m_assetPackPath.path_join(canonicalName), m_assetPackPath.path_join(duplicateName))) { ++compareIndex; continue; }
+                mergeRepairPackSidecarsInTable(p_table_name, canonicalName, duplicateName, false);
+                duplicateNames.remove_at(compareIndex);
             }
         }
     }
 
     void Importer::deduplicateGltfAssetsInManifest() {
         if(!m_assetsPackManifest.has(ASSETS_KEY)) return;
-        bool progress = true;
-        while(progress) {
-            progress = false;
-            Dictionary A   = Dictionary(m_assetsPackManifest[ASSETS_KEY]);
-            const Array ak = A.keys();
-            Dictionary metaKeys;
-            for(int i = 0; i < ak.size(); ++i) {
-                const String nm = String(ak[i]);
-                if(!A.has(Variant(nm))) continue;
-                const Dictionary da = Dictionary(A[nm]);
-                Dictionary dab, dat;
-                extractBinTexMapsFromAssetRow(da, dab, dat);
-                const String tp = da.has(TRUE_PATH_KEY) ? String(da[TRUE_PATH_KEY]) : String();
-                metaKeys[Variant(nm)] = tp + String(";") + fingerprintManifestSidecarDict(dab) + String(";")
-                    + fingerprintManifestSidecarDict(dat);
+        bool progressMade = true;
+        while(progressMade) {
+            progressMade = false;
+            Dictionary assetsDict   = Dictionary(m_assetsPackManifest[ASSETS_KEY]);
+            const Array assetKeys   = assetsDict.keys();
+            Dictionary assetFingerprints;
+            for(int i = 0; i < assetKeys.size(); ++i) {
+                const String assetFilename = String(assetKeys[i]);
+                if(!assetsDict.has(Variant(assetFilename))) continue;
+                const Dictionary assetRow = Dictionary(assetsDict[assetFilename]);
+                Dictionary binSidecars, texSidecars;
+                extractBinTexMapsFromAssetRow(assetRow, binSidecars, texSidecars);
+                const String truePath = assetRow.has(TRUE_PATH_KEY) ? String(assetRow[TRUE_PATH_KEY]) : String();
+                assetFingerprints[Variant(assetFilename)] = truePath + String(";") + fingerprintManifestSidecarDict(binSidecars) + String(";")
+                    + fingerprintManifestSidecarDict(texSidecars);
             }
             bool merged = false;
-            for(int i = 0; i < ak.size() - 1 && !merged; ++i) {
-                const String rowA = String(ak[i]);
-                if(!A.has(Variant(rowA))) continue;
-                const String metaA = String(metaKeys[rowA]);
-                for(int jj = i + 1; jj < ak.size() && !merged; ++jj) {
-                    const String kb = String(ak[jj]);
-                    if(!A.has(Variant(kb))) continue;
-                    if(String(metaKeys[kb]) != metaA) continue;
-                    if(mergeRepairDuplicateGltfPackFiles(rowA, kb, false, false)) {
-                        merged = true; progress = true;
+            for(int i = 0; i < assetKeys.size() - 1 && !merged; ++i) {
+                const String assetFilenameA = String(assetKeys[i]);
+                if(!assetsDict.has(Variant(assetFilenameA))) continue;
+                const String fingerprintA = String(assetFingerprints[assetFilenameA]);
+                for(int secondIndex = i + 1; secondIndex < assetKeys.size() && !merged; ++secondIndex) {
+                    const String assetFilenameB = String(assetKeys[secondIndex]);
+                    if(!assetsDict.has(Variant(assetFilenameB))) continue;
+                    if(String(assetFingerprints[assetFilenameB]) != fingerprintA) continue;
+                    if(mergeRepairDuplicateGltfPackFiles(assetFilenameA, assetFilenameB, false, false)) {
+                        merged = true; progressMade = true;
                     }
                 }
             }

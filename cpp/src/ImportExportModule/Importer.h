@@ -80,7 +80,7 @@ namespace ImportExportModule {
             S_DeletionQueue  deletions;                                   //!< Deletion backlog accumulated during the repair pass.
             Array            workQueue;                                   //!< General-purpose per-step work list (orphan gltf names, etc.).
             Array            thumbnailQueue;                              //!< Absolute glTF paths needing a thumbnail after repair.
-            Array            sizeBuckets;                                 //!< Candidate dedup groups, each a Dictionary with "names" and "_j".
+            Array            sizeBuckets;                                 //!< Candidate dedup groups, each a Dictionary with "names" and DEDUP_COMPARE_INDEX_KEY.
             int64_t          dedupIdx        = 0;                         //!< Index into sizeBuckets currently being processed.
             bool             dedupIsGltfWave = false;                     //!< True during the glTF-manifest dedup wave, false for sidecar wave.
         };
@@ -90,6 +90,7 @@ namespace ImportExportModule {
         String           m_assetPackPath;              //!< Absolute pack root on disk.
         String           m_importSourceRoot;           //!< Absolute import tree root for true_path derivation.
         Ref<PackedScene> m_importerPictureMakerScene;  //!< Cached scene resource used to instantiate ImporterPictureMaker nodes.
+        Node*            m_systemEventBus;             //!< /root/SystemEventBus autoload node, cached in _ready.
         double           m_timeBudget;                 //!< Microsecond budget remaining for the current frame slice.
         S_CopyCtx        m_copy;                       //!< Live context for the Copying workflow.
         S_PicturingCtx   m_picturing;                  //!< Live context for the Picturing workflow.
@@ -147,7 +148,22 @@ namespace ImportExportModule {
              */
             bool setupRemoveAssetsFromPack(const String& p_assetPackPath, const Array& p_packGltfFileNames);
 
+            /**
+             * @brief Synchronous utility: loads the manifest at p_pack_root, recomputes counters, and writes it back.
+             * @details Designed to be called directly from GDScript without running the full FSM.
+             *          Does not require the node to be in the scene tree or _ready() to have been called.
+             * @param p_pack_root Absolute path to the asset pack root directory.
+             * @return True on success, false if the manifest cannot be loaded or written.
+             */
+            bool recomputeAndWriteManifest(const String& p_pack_root);
+
         private:
+            /** @brief Emits loading_event on SystemEventBus if the pointer is valid. **/
+            inline void _emitLoading(const String& p_protocol, const String& p_sub, const String& p_element) const {
+                if(m_systemEventBus == nullptr) return;
+                m_systemEventBus->emit_signal(StringName("loading_event"), p_protocol, p_sub, p_element);
+            }
+
             // ── Manifest helpers ──────────────────────────────────────────────────────
 
             /**
@@ -449,19 +465,19 @@ namespace ImportExportModule {
             void repairFinalizeAfterRepairWrite();
 
             /**
-             * @brief Updates only the _j field of a size bucket in-place.
-             * @param p_bucket Bucket Dictionary to update.
-             * @param p_jj     New value for the _j iterator field.
+             * @brief Updates only the compare iterator field of a size bucket in-place.
+             * @param p_bucket        Bucket Dictionary to update.
+             * @param p_compare_index New value for the compare iterator field.
              */
-            void repairDedupPersistJjOnly(Dictionary& p_bucket, int64_t p_jj);
+            void repairDedupPersistJjOnly(Dictionary& p_bucket, int64_t p_compare_index);
 
             /**
-             * @brief Writes updated names and _j back into a size bucket in-place.
-             * @param p_bucket Bucket Dictionary to update.
-             * @param p_names  Updated names Array.
-             * @param p_jj     New value for the _j iterator field.
+             * @brief Writes updated names and compare iterator back into a size bucket in-place.
+             * @param p_bucket        Bucket Dictionary to update.
+             * @param p_names         Updated names Array.
+             * @param p_compare_index New value for the compare iterator field.
              */
-            void repairDedupPersistBucket(Dictionary& p_bucket, const Array& p_names, int64_t p_jj);
+            void repairDedupPersistBucket(Dictionary& p_bucket, const Array& p_names, int64_t p_compare_index);
 
             /**
              * @brief Merges two duplicate glTF pack files by removing p_drop from the manifest and from disk.

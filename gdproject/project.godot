@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 HexMapEventBus="*res://scripts/AutoLoad/HexMapEventBus.gd"
+ManifestUtils="*res://scripts/AutoLoad/ManifestUtils.gd"
 RuntimeData="*res://scripts/AutoLoad/RuntimeData.gd"
 SystemEventBus="*res://scripts/AutoLoad/SystemEventBus.gd"
 

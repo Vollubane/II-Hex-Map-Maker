@@ -1,9 +1,10 @@
-[gd_scene load_steps=14 format=3 uid="uid://bncpp00u1fd34"]
+[gd_scene load_steps=15 format=3 uid="uid://bncpp00u1fd34"]
 
 [ext_resource type="Theme" uid="uid://bn75xffs0b7v8" path="res://Ressource/PanelTheme/ClassiqueTheme.tres" id="1_lowec"]
 [ext_resource type="Theme" uid="uid://d1bbw4jc26hyy" path="res://Ressource/PanelTheme/Title&FlatButtonTheme.tres" id="2_j8lcn"]
 [ext_resource type="Theme" uid="uid://cwoxbbjk540ed" path="res://Ressource/PanelTheme/ClassiqueGreenTheme.tres" id="3_88nc8"]
 [ext_resource type="Theme" uid="uid://cmbam06wcmkwr" path="res://Ressource/PanelTheme/ClassiqueRedTheme.tres" id="6_lwqwb"]
+[ext_resource type="PackedScene" uid="uid://dyslm75qwfm5x" path="res://Scene/UI Node/Elements/WarningLabel.tscn" id="8_6eo2g"]
 [ext_resource type="Script" uid="uid://c1vtub3fn0svb" path="res://scripts/UI/HexMapList.gd" id="HexMapList_script"]
 [ext_resource type="Script" uid="uid://c5srdrtock84j" path="res://scripts/UI/HexPackList.gd" id="HexPackList_script"]
 [ext_resource type="Script" uid="uid://cgw5giwgdj8o5" path="res://scripts/UI/MainMenu.gd" id="MainMenu_script"]
@@ -348,3 +349,6 @@ theme_override_styles/focus = SubResource("StyleBoxFlat_6eo2g")
 clip_contents = true
 layout_mode = 2
 size_flags_horizontal = 3
+
+[node name="WarningLabel" parent="." instance=ExtResource("8_6eo2g")]
+layout_mode = 1
